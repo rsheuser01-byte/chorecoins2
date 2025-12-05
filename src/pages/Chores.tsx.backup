@@ -1,0 +1,797 @@
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, CheckCircle, Clock, DollarSign, Zap, Star, Trophy, Calendar as CalendarIcon, List, Target, Gift, Crown, Sparkles, Rocket, Heart, Home, Car, Dog, Book, Music, Gamepad2, Shirt, Utensils, Trash2, Leaf, Sun, Moon, Rainbow, Edit } from 'lucide-react';
+import { useGamification } from '@/hooks/useGamification';
+import { GamificationWidget } from '@/components/GamificationWidget';
+import { ChoreCalendar, type Chore } from '@/components/ChoreCalendar';
+import { format, isToday } from 'date-fns';
+
+// Default weekly allowance - can be adjusted in settings
+const DEFAULT_WEEKLY_ALLOWANCE = 20; // $20 per week
+
+// Enhanced chore categories with fun themes (no individual rewards)
+const choreCategories = {
+  '🏠 Home': {
+    icon: Home,
+    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-200',
+    borderColor: 'border-blue-200 dark:border-blue-800',
+    chores: [
+      { title: 'Make Bed', difficulty: 'easy', emoji: '🛏️', description: 'Start your day right!' },
+      { title: 'Clean Room', difficulty: 'medium', emoji: '🧹', description: 'Make it sparkle!' },
+      { title: 'Organize Desk', difficulty: 'easy', emoji: '📚', description: 'Find everything easily!' },
+      { title: 'Vacuum Floor', difficulty: 'medium', emoji: '🧽', description: 'Clean floors feel great!' },
+      { title: 'Dust Furniture', difficulty: 'easy', emoji: '✨', description: 'Make it shine!' }
+    ]
+  },
+  '🍽️ Kitchen': {
+    icon: Utensils,
+    color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-200',
+    borderColor: 'border-orange-200 dark:border-orange-800',
+    chores: [
+      { title: 'Help With Dishes', difficulty: 'easy', emoji: '🍽️', description: 'Clean dishes, happy family!' },
+      { title: 'Set Table', difficulty: 'easy', emoji: '🍴', description: 'Make dinner special!' },
+      { title: 'Clear Table', difficulty: 'easy', emoji: '🧽', description: 'Clean up after eating!' },
+      { title: 'Load Dishwasher', difficulty: 'medium', emoji: '📦', description: 'Organize like a pro!' },
+      { title: 'Help Cook Dinner', difficulty: 'hard', emoji: '👨‍🍳', description: 'Be a chef helper!' }
+    ]
+  },
+  '🐕 Pet Care': {
+    icon: Dog,
+    color: 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200',
+    borderColor: 'border-green-200 dark:border-green-800',
+    chores: [
+      { title: 'Walk Dog', difficulty: 'medium', emoji: '🐕', description: 'Exercise is fun!' },
+      { title: 'Feed Pet', difficulty: 'easy', emoji: '🍽️', description: 'Keep them happy!' },
+      { title: 'Play With Pet', difficulty: 'easy', emoji: '🎾', description: 'Fun for both of you!' },
+      { title: 'Clean Pet Area', difficulty: 'medium', emoji: '🧹', description: 'Keep it fresh!' },
+      { title: 'Brush Pet', difficulty: 'easy', emoji: '🪥', description: 'Make them beautiful!' }
+    ]
+  },
+  '🌱 Garden': {
+    icon: Leaf,
+    color: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-200',
+    borderColor: 'border-emerald-200 dark:border-emerald-800',
+    chores: [
+      { title: 'Water Plants', difficulty: 'easy', emoji: '💧', description: 'Help them grow!' },
+      { title: 'Pull Weeds', difficulty: 'medium', emoji: '🌿', description: 'Keep garden clean!' },
+      { title: 'Plant Seeds', difficulty: 'medium', emoji: '🌱', description: 'Watch them grow!' },
+      { title: 'Rake Leaves', difficulty: 'medium', emoji: '🍂', description: 'Autumn cleanup!' },
+      { title: 'Harvest Vegetables', difficulty: 'easy', emoji: '🥕', description: 'Fresh food!' }
+    ]
+  },
+  '🚗 Outside': {
+    icon: Car,
+    color: 'bg-purple-100 text-purple-800 dark:bg-purple-900/20 dark:text-purple-200',
+    borderColor: 'border-purple-200 dark:border-purple-800',
+    chores: [
+      { title: 'Take Out Trash', difficulty: 'easy', emoji: '🗑️', description: 'Keep it clean!' },
+      { title: 'Get Mail', difficulty: 'easy', emoji: '📬', description: 'Check for surprises!' },
+      { title: 'Wash Car', difficulty: 'hard', emoji: '🚗', description: 'Make it shine!' },
+      { title: 'Sweep Driveway', difficulty: 'medium', emoji: '🧹', description: 'Clean entrance!' },
+      { title: 'Water Lawn', difficulty: 'medium', emoji: '🌱', description: 'Keep grass green!' }
+    ]
+  },
+  '📚 Learning': {
+    icon: Book,
+    color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/20 dark:text-indigo-200',
+    borderColor: 'border-indigo-200 dark:border-indigo-800',
+    chores: [
+      { title: 'Read for 20 Minutes', difficulty: 'easy', emoji: '📖', description: 'Adventure awaits!' },
+      { title: 'Practice Piano', difficulty: 'medium', emoji: '🎹', description: 'Make beautiful music!' },
+      { title: 'Do Homework', difficulty: 'medium', emoji: '✏️', description: 'Learn and grow!' },
+      { title: 'Study for Test', difficulty: 'hard', emoji: '📝', description: 'Ace that test!' },
+      { title: 'Write in Journal', difficulty: 'easy', emoji: '📔', description: 'Record your thoughts!' }
+    ]
+  }
+};
+
+// Convert old chore format to new format
+const convertToNewFormat = (oldChores: any[]): Chore[] => {
+  return oldChores.map(chore => ({
+    id: chore.id.toString(),
+    title: chore.title,
+    description: '',
+    reward: 0, // No individual rewards in weekly allowance system
+    completed: chore.completed,
+    dueDate: new Date(), // Default to today for existing chores
+    recurring: 'none' as const,
+    priority: 'medium' as const,
+    category: 'General'
+  }));
+};
+
+const mockChores = [
+  { id: 1, title: 'Make Bed', reward: 2, completed: true, dueDate: 'Today' },
+  { id: 2, title: 'Take Out Trash', reward: 5, completed: false, dueDate: 'Today' },
+  { id: 3, title: 'Clean Room', reward: 10, completed: false, dueDate: 'Tomorrow' },
+  { id: 4, title: 'Help With Dishes', reward: 3, completed: false, dueDate: 'Today' },
+  { id: 5, title: 'Walk Dog', reward: 8, completed: true, dueDate: 'Today' },
+];
+
+const Chores = () => {
+  const [choreData, setChoreData] = useState<Chore[]>(() => {
+    const saved = localStorage.getItem('chores');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Check if it's the old format and convert
+        if (parsed.length > 0 && typeof parsed[0].id === 'number') {
+          return convertToNewFormat(parsed);
+        }
+        return parsed;
+      } catch {
+        return convertToNewFormat(mockChores);
+      }
+    }
+    return convertToNewFormat(mockChores);
+  });
+
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [isAddChoreOpen, setIsAddChoreOpen] = useState(false);
+  const [isEditChoreOpen, setIsEditChoreOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [editingChore, setEditingChore] = useState<Chore | null>(null);
+  const [weeklyAllowance, setWeeklyAllowance] = useState<number>(() => {
+    const saved = localStorage.getItem('weeklyAllowance');
+    return saved ? parseInt(saved) : DEFAULT_WEEKLY_ALLOWANCE;
+  });
+  const [newChore, setNewChore] = useState({
+    title: '',
+    description: '',
+    category: '🏠 Home',
+    difficulty: 'easy' as 'easy' | 'medium' | 'hard',
+    emoji: '⭐'
+  });
+  const [celebration, setCelebration] = useState<{show: boolean, message: string, chore: string}>({
+    show: false,
+    message: '',
+    chore: ''
+  });
+
+  const { userStats, completeChore } = useGamification();
+
+  // Celebration effect
+  useEffect(() => {
+    if (celebration.show) {
+      const timer = setTimeout(() => {
+        setCelebration({ show: false, message: '', chore: '' });
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [celebration.show]);
+
+  // Get today's chores for the traditional view
+  const todayChores = choreData.filter(chore => isToday(chore.dueDate));
+  
+  const toggleChore = (id: string) => {
+    const chore = choreData.find(c => c.id === id);
+    if (chore && !chore.completed) {
+      // Mark as completed and award XP
+      completeChore(chore.reward);
+      
+      // Show celebration
+      const celebrations = [
+        `🎉 Awesome! You completed "${chore.title}"!`,
+        `✨ Great job! "${chore.title}" is done!`,
+        `🏆 Fantastic! You finished "${chore.title}"!`,
+        `🌟 Amazing! "${chore.title}" completed!`,
+        `🎊 Well done! "${chore.title}" finished!`,
+        `🚀 Excellent! You did "${chore.title}"!`,
+        `💫 Wonderful! "${chore.title}" is complete!`,
+        `🎈 Super! You finished "${chore.title}"!`
+      ];
+      
+      setCelebration({
+        show: true,
+        message: celebrations[Math.floor(Math.random() * celebrations.length)],
+        chore: chore.title
+      });
+    }
+    
+    const updatedChores = choreData.map(chore => 
+      chore.id === id ? { ...chore, completed: !chore.completed } : chore
+    );
+    setChoreData(updatedChores);
+    localStorage.setItem('chores', JSON.stringify(updatedChores));
+  };
+
+  const addChore = () => {
+    if (!newChore.title.trim()) return;
+    
+    const chore: Chore = {
+      id: Date.now().toString(),
+      title: newChore.title,
+      description: newChore.description,
+      reward: 0, // No individual reward - weekly allowance system
+      completed: false,
+      dueDate: new Date(),
+      recurring: 'none',
+      priority: 'medium',
+      category: newChore.category
+    };
+    
+    setChoreData([...choreData, chore]);
+    localStorage.setItem('chores', JSON.stringify([...choreData, chore]));
+    
+    // Reset form
+    setNewChore({
+      title: '',
+      description: '',
+      category: '🏠 Home',
+      difficulty: 'easy',
+      emoji: '⭐'
+    });
+    setIsAddChoreOpen(false);
+  };
+
+  const editChore = () => {
+    if (!editingChore) return;
+    
+    const updatedChores = choreData.map(chore =>
+      chore.id === editingChore.id ? editingChore : chore
+    );
+    
+    setChoreData(updatedChores);
+    localStorage.setItem('chores', JSON.stringify(updatedChores));
+    setIsEditChoreOpen(false);
+    setEditingChore(null);
+  };
+
+  const openEditDialog = (chore: Chore) => {
+    setEditingChore({ ...chore });
+    setIsEditChoreOpen(true);
+  };
+
+  const saveWeeklyAllowance = (newAmount: number) => {
+    setWeeklyAllowance(newAmount);
+    localStorage.setItem('weeklyAllowance', newAmount.toString());
+    setIsSettingsOpen(false);
+  };
+
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/20 dark:text-yellow-200';
+      case 'hard': return 'bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-200';
+    }
+  };
+
+  const getDifficultyIcon = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return '🟢';
+      case 'medium': return '🟡';
+      case 'hard': return '🔴';
+      default: return '⚪';
+    }
+  };
+
+  const handleChoreUpdate = (updatedChores: Chore[]) => {
+    setChoreData(updatedChores);
+    localStorage.setItem('chores', JSON.stringify(updatedChores));
+  };
+
+  const handleChoreComplete = (chore: Chore) => {
+    // Award XP for completing the chore
+    completeChore(20); // 20 XP per chore
+    
+    // Check if all chores are now completed to award weekly allowance
+    const updatedChores = choreData.map(c => c.id === chore.id ? { ...c, completed: true } : c);
+    const allCompleted = updatedChores.every(c => c.completed);
+    
+    if (allCompleted && updatedChores.length > 0) {
+      // Award the full weekly allowance
+      completeChore(weeklyAllowance * 10); // Convert to XP (multiply by 10)
+      
+      // Show celebration for earning allowance
+      setCelebration({
+        show: true,
+        message: `Amazing! You completed all chores and earned your $${weeklyAllowance} weekly allowance!`,
+        chore: 'Weekly Allowance'
+      });
+      
+      setTimeout(() => setCelebration({ show: false, message: '', chore: '' }), 3000);
+    }
+  };
+
+  const completedChores = todayChores.filter(chore => chore.completed).length;
+  const totalChores = todayChores.length;
+  const progressPercentage = totalChores > 0 ? (completedChores / totalChores) * 100 : 0;
+  
+  // Weekly allowance calculation - earn full allowance if all chores completed
+  const weeklyEarnings = completedChores === totalChores && totalChores > 0 ? weeklyAllowance : 0;
+  const allowanceProgress = totalChores > 0 ? (completedChores / totalChores) * 100 : 0;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
+      {/* Celebration Overlay */}
+      {celebration.show && (
+        <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl animate-bounce">
+            <div className="text-center">
+              <div className="text-6xl mb-4">🎉</div>
+              <h2 className="text-2xl font-bold text-green-600 mb-2">Congratulations!</h2>
+              <p className="text-lg">{celebration.message}</p>
+              <div className="mt-4 flex justify-center gap-2">
+                <Badge className="bg-money-green text-white">+${weeklyAllowance} Weekly Allowance</Badge>
+                <Badge className="bg-money-gold text-white">+20 XP</Badge>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
+        <div className="grid lg:grid-cols-4 gap-4 sm:gap-6">
+          <div className="lg:col-span-3 space-y-4 sm:space-y-6">
+            {/* Enhanced Header */}
+            <div className="mb-6 sm:mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2">
+                    <span className="bg-gradient-to-r from-money-green to-money-gold bg-clip-text text-transparent">
+                      My Chores
+                    </span>
+                    <Zap className="h-6 w-6 sm:h-8 sm:w-8 text-crypto-orange" />
+                  </h1>
+                  <p className="text-muted-foreground text-sm sm:text-base">
+                    Complete your chores to earn allowance and XP! 🎯
+                  </p>
+                </div>
+                
+                <div className="flex gap-2">
+                  <Dialog open={isSettingsOpen} onOpenChange={setIsSettingsOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm">
+                        <Edit className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Settings</span>
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                          <Edit className="h-5 w-5" />
+                          Chore Settings
+                        </DialogTitle>
+                        <DialogDescription>
+                          Adjust your weekly allowance amount
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="weekly-allowance">Weekly Allowance ($)</Label>
+                          <Input
+                            id="weekly-allowance"
+                            type="number"
+                            value={weeklyAllowance}
+                            onChange={(e) => setWeeklyAllowance(parseInt(e.target.value) || 0)}
+                            min="1"
+                            max="100"
+                            placeholder="Enter weekly allowance amount"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Amount earned when all chores are completed
+                          </p>
+                        </div>
+                        
+                        <div className="flex gap-3 pt-4">
+                          <Button variant="outline" onClick={() => setIsSettingsOpen(false)} className="flex-1">
+                            Cancel
+                          </Button>
+                          <Button onClick={() => saveWeeklyAllowance(weeklyAllowance)} className="flex-1 bg-money-green hover:bg-money-green/90">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Save Settings
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                  
+                  <Dialog open={isAddChoreOpen} onOpenChange={setIsAddChoreOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="bg-money-green hover:bg-money-green/90 text-white">
+                        <Plus className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Add Chore</span>
+                        <span className="sm:hidden">Add</span>
+                      </Button>
+                    </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Plus className="h-5 w-5" />
+                        Add New Chore
+                      </DialogTitle>
+                      <DialogDescription>
+                        Create a new chore to earn rewards!
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Chore Title</Label>
+                        <Input
+                          id="title"
+                          value={newChore.title}
+                          onChange={(e) => setNewChore({ ...newChore, title: e.target.value })}
+                          placeholder="e.g., Make Bed"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Description (Optional)</Label>
+                        <Textarea
+                          id="description"
+                          value={newChore.description}
+                          onChange={(e) => setNewChore({ ...newChore, description: e.target.value })}
+                          placeholder="Add a fun description..."
+                          className="min-h-[80px]"
+                        />
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="difficulty">Difficulty</Label>
+                        <Select value={newChore.difficulty} onValueChange={(value: 'easy' | 'medium' | 'hard') => setNewChore({ ...newChore, difficulty: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="easy">🟢 Easy</SelectItem>
+                            <SelectItem value="medium">🟡 Medium</SelectItem>
+                            <SelectItem value="hard">🔴 Hard</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="category">Category</Label>
+                        <Select value={newChore.category} onValueChange={(value) => setNewChore({ ...newChore, category: value })}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(choreCategories).map(category => (
+                              <SelectItem key={category} value={category}>{category}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      <div className="flex gap-3 pt-4">
+                        <Button variant="outline" onClick={() => setIsAddChoreOpen(false)} className="flex-1">
+                          Cancel
+                        </Button>
+                        <Button onClick={addChore} className="flex-1 bg-money-green hover:bg-money-green/90">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Chore
+                        </Button>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                {/* Edit Chore Dialog */}
+                <Dialog open={isEditChoreOpen} onOpenChange={setIsEditChoreOpen}>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <Edit className="h-5 w-5" />
+                        Edit Chore
+                      </DialogTitle>
+                      <DialogDescription>
+                        Update the reward amount and other details for this chore.
+                      </DialogDescription>
+                    </DialogHeader>
+                    
+                    {editingChore && (
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-title">Chore Title</Label>
+                          <Input
+                            id="edit-title"
+                            value={editingChore.title}
+                            onChange={(e) => setEditingChore({ ...editingChore, title: e.target.value })}
+                            placeholder="e.g., Make Bed"
+                          />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="edit-description">Description (Optional)</Label>
+                          <Textarea
+                            id="edit-description"
+                            value={editingChore.description}
+                            onChange={(e) => setEditingChore({ ...editingChore, description: e.target.value })}
+                            placeholder="Add a fun description..."
+                            className="min-h-[80px]"
+                          />
+                        </div>
+                        
+                        
+                        <div className="flex gap-3 pt-4">
+                          <Button variant="outline" onClick={() => setIsEditChoreOpen(false)} className="flex-1">
+                            Cancel
+                          </Button>
+                          <Button onClick={editChore} className="flex-1 bg-money-green hover:bg-money-green/90">
+                            <Edit className="h-4 w-4 mr-2" />
+                            Save Changes
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </DialogContent>
+                </Dialog>
+
+              </div>
+            </div>
+
+            <Tabs defaultValue="today" className="space-y-4 sm:space-y-6">
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 gap-1 h-auto p-1 bg-muted/50">
+                <TabsTrigger value="today" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 sm:py-3 text-xs sm:text-sm font-medium">
+                  <List className="h-4 w-4" />
+                  <span className="hidden sm:inline">Today's List</span>
+                  <span className="sm:hidden">📋</span>
+                </TabsTrigger>
+                <TabsTrigger value="calendar" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 sm:py-3 text-xs sm:text-sm font-medium">
+                  <CalendarIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Calendar</span>
+                  <span className="sm:hidden">📅</span>
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="flex flex-col sm:flex-row items-center gap-1 sm:gap-2 py-2 sm:py-3 text-xs sm:text-sm font-medium">
+                  <Target className="h-4 w-4" />
+                  <span className="hidden sm:inline">Categories</span>
+                  <span className="sm:hidden">🎯</span>
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="calendar">
+                <ChoreCalendar 
+                  chores={choreData}
+                  onChoreUpdate={handleChoreUpdate}
+                  onChoreComplete={handleChoreComplete}
+                />
+              </TabsContent>
+
+              <TabsContent value="today" className="space-y-4 sm:space-y-6">
+                {/* Enhanced Stats Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                  <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 border-green-200 dark:border-green-800 hover:shadow-lg transition-all duration-300">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-xs sm:text-sm font-medium">✅ Completed Today</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-money-green" />
+                        <span className="text-xs text-money-green">+20 XP each</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl font-bold">{completedChores}/{todayChores.length}</div>
+                      <Progress value={progressPercentage} className="mt-2 h-2" />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {progressPercentage === 100 ? '🎉 All done!' : `${Math.round(progressPercentage)}% complete`}
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/20 dark:to-amber-950/20 border-yellow-200 dark:border-yellow-800 hover:shadow-lg transition-all duration-300">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-xs sm:text-sm font-medium">💰 Weekly Allowance</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-money-gold" />
+                        <Star className="h-3 w-3 text-money-gold" />
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl font-bold text-money-green">${weeklyEarnings}</div>
+                      <Progress value={allowanceProgress} className="mt-2 h-2" />
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        {weeklyEarnings > 0 ? 'Allowance earned! 🎉' : `${completedChores}/${totalChores} chores done`} <Trophy className="h-3 w-3" />
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 border-orange-200 dark:border-orange-800 hover:shadow-lg transition-all duration-300">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                      <CardTitle className="text-xs sm:text-sm font-medium">🔥 Chore Streak</CardTitle>
+                      <div className="flex items-center gap-1">
+                        <Zap className="h-3 w-3 sm:h-4 sm:w-4 text-crypto-orange" />
+                        <span className="text-xs text-crypto-orange">On Fire!</span>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-lg sm:text-2xl font-bold text-crypto-orange">{userStats.choreStreak} days</div>
+                      <Progress value={Math.min((userStats.choreStreak / 7) * 100, 100)} className="mt-2 h-2" />
+                      <p className="text-xs text-muted-foreground">Goal: 7 days</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Today's Chores List */}
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-4 sm:mb-6">
+                  <h2 className="text-lg sm:text-xl font-semibold flex items-center gap-2">
+                    <span className="bg-gradient-to-r from-money-green to-money-gold bg-clip-text text-transparent">
+                      Today's Chores
+                    </span>
+                    <Badge variant="outline" className="bg-money-green/20 text-money-green border-money-green/30">
+                      {todayChores.length - completedChores} left
+                    </Badge>
+                  </h2>
+                  
+                  {todayChores.length === 0 && (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">🎯</div>
+                      <h3 className="text-lg font-medium mb-2">No chores for today!</h3>
+                      <p className="text-muted-foreground mb-4">Add some chores to start earning rewards!</p>
+                      <Button onClick={() => setIsAddChoreOpen(true)} className="bg-money-green hover:bg-money-green/90">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Your First Chore
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-3 sm:gap-4">
+                  {todayChores.map((chore) => {
+                    const categoryData = Object.values(choreCategories).find(cat => 
+                      cat.chores.some(c => c.title === chore.title)
+                    );
+                    const choreData = categoryData?.chores.find(c => c.title === chore.title);
+                    
+                    return (
+                      <Card key={chore.id} className={`transition-all duration-300 hover:scale-105 hover:shadow-lg ${
+                        chore.completed 
+                          ? 'bg-gradient-to-r from-green-50 to-money-green/10 dark:from-green-950/20 dark:to-money-green/10 border-money-green/30 shadow-lg' 
+                          : 'hover:shadow-md border-2 border-dashed border-muted hover:border-money-green/50'
+                      }`}>
+                        <CardContent className="flex items-center justify-between p-4 sm:p-6">
+                          <div className="flex items-center space-x-3 sm:space-x-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleChore(chore.id)}
+                              className={`p-0 h-8 w-8 sm:h-10 sm:w-10 rounded-full transition-all duration-300 ${
+                                chore.completed 
+                                  ? 'bg-money-green text-white scale-110' 
+                                  : 'border-2 border-muted-foreground hover:border-money-green hover:scale-110'
+                              }`}
+                            >
+                              {chore.completed ? <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" /> : 
+                               choreData?.emoji ? <span className="text-lg">{choreData.emoji}</span> : '○'}
+                            </Button>
+                            
+                            <div>
+                              <h3 className={`font-medium text-sm sm:text-base transition-all ${
+                                chore.completed ? 'line-through text-muted-foreground' : ''
+                              }`}>
+                                {chore.title}
+                              </h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-2">
+                                Due: Today
+                                {!chore.completed && <Zap className="h-3 w-3 text-crypto-orange" />}
+                                {choreData?.difficulty && (
+                                  <Badge variant="outline" className={`text-xs ${getDifficultyColor(choreData.difficulty)}`}>
+                                    {getDifficultyIcon(choreData.difficulty)} {choreData.difficulty}
+                                  </Badge>
+                                )}
+                              </p>
+                              {choreData?.description && !chore.completed && (
+                                <p className="text-xs text-muted-foreground mt-1">{choreData.description}</p>
+                              )}
+                            </div>
+                          </div>
+
+                           <div className="flex items-center space-x-2 sm:space-x-3">
+                             <Button
+                               variant="ghost"
+                               size="sm"
+                               onClick={() => openEditDialog(chore)}
+                               className="h-8 w-8 p-0 hover:bg-muted"
+                             >
+                               <Edit className="h-4 w-4" />
+                             </Button>
+                             {chore.completed && (
+                               <Badge variant="default" className="bg-money-green text-white text-xs sm:text-sm">
+                                 <CheckCircle className="h-3 w-3 mr-1" />
+                                 +20 XP
+                               </Badge>
+                             )}
+                           </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="categories" className="space-y-4 sm:space-y-6">
+                <div className="grid gap-4 sm:gap-6">
+                  {Object.entries(choreCategories).map(([categoryName, categoryData]) => {
+                    const Icon = categoryData.icon;
+                    const categoryChores = categoryData.chores;
+                    
+                    return (
+                      <Card key={categoryName} className={`transition-all duration-300 hover:shadow-lg ${categoryData.color} ${categoryData.borderColor} border-2`}>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                            <Icon className="h-5 w-5 sm:h-6 sm:w-6" />
+                            {categoryName}
+                          </CardTitle>
+                          <CardDescription className="text-sm sm:text-base">
+                            Choose from {categoryChores.length} fun {categoryName.toLowerCase()} chores!
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid gap-3 sm:gap-4">
+                            {categoryChores.map((chore, index) => (
+                              <div key={index} className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-900/50 rounded-lg border border-white/20 dark:border-gray-800/20">
+                                <div className="flex items-center gap-3">
+                                  <span className="text-2xl">{chore.emoji}</span>
+                                  <div>
+                                    <h4 className="font-medium text-sm sm:text-base">{chore.title}</h4>
+                                    <p className="text-xs sm:text-sm text-muted-foreground">{chore.description}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className={`text-xs ${getDifficultyColor(chore.difficulty)}`}>
+                                    {getDifficultyIcon(chore.difficulty)} {chore.difficulty}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+          
+          {/* Enhanced Gamification Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="space-y-4 sm:space-y-6">
+              <GamificationWidget />
+              
+              {/* Quick Stats */}
+              <Card className="bg-gradient-to-br from-background to-muted/20 border-muted/50">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                    <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-money-gold" />
+                    Quick Stats
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Total Chores</span>
+                    <Badge className="bg-money-green text-white">{choreData.length}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Completed Today</span>
+                    <Badge className="bg-money-gold text-white">{completedChores}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Total Earnings</span>
+                    <Badge className="bg-crypto-orange text-white">${userStats.totalMoneyEarned}</Badge>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">Current Streak</span>
+                    <Badge className="bg-purple-600 text-white">{userStats.choreStreak} days</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Chores;

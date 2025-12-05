@@ -1,0 +1,63 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="halloweenGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff3e0;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#ffcc80;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  <!-- Halloween pumpkins -->
+  <g transform="translate(40, 40)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+  <g transform="translate(100, 60)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2.3s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+  <g transform="translate(160, 30)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="1.8s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+  <g transform="translate(20, 120)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2.1s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+  <g transform="translate(80, 140)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2.4s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+  <g transform="translate(140, 160)">
+    <ellipse cx="0" cy="0" rx="15" ry="20" fill="#ff9800" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="1.9s" repeatCount="indefinite"/>
+    </ellipse>
+    <rect x="-2" y="-25" width="4" height="8" fill="#8d6e63" opacity="0.9"/>
+    <path d="M-8,-15 Q-5,-20 -2,-15 Q1,-20 4,-15 Q1,-10 -2,-15 Q-5,-10 -8,-15" fill="#000" opacity="0.8"/>
+    <path d="M-6,-5 Q-3,-10 0,-5 Q3,-10 6,-5 Q3,0 0,-5 Q-3,0 -6,-5" fill="#000" opacity="0.8"/>
+    <path d="M-4,5 Q-1,0 2,5 Q5,0 8,5 Q5,10 2,5 Q-1,10 -4,5" fill="#000" opacity="0.8"/>
+  </g>
+</svg>

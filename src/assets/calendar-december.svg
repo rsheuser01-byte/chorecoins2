@@ -1,0 +1,21 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="christmasGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e8f5e8;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#c8e6c9;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  <!-- Christmas tree -->
+  <g transform="translate(100, 100)">
+    <polygon points="0,-30 15,0 0,15 -15,0" fill="#4caf50" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+    </polygon>
+    <polygon points="0,-20 12,5 0,20 -12,5" fill="#66bb6a" opacity="0.9"/>
+    <polygon points="0,-10 10,10 0,25 -10,10" fill="#81c784" opacity="0.7"/>
+    <rect x="-2" y="25" width="4" height="15" fill="#8d6e63" opacity="0.9"/>
+    <circle cx="-8" cy="-15" r="2" fill="#f44336" opacity="0.8"/>
+    <circle cx="8" cy="-10" r="2" fill="#2196f3" opacity="0.8"/>
+    <circle cx="-5" cy="0" r="2" fill="#ffeb3b" opacity="0.8"/>
+    <circle cx="5" cy="5" r="2" fill="#f44336" opacity="0.8"/>
+  </g>
+</svg>

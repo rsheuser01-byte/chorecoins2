@@ -1,0 +1,22 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="thanksgivingGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#fff3e0;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#ffcc80;stop-opacity:0.6" />
+    </linearGradient>
+  </defs>
+  <!-- Thanksgiving turkey -->
+  <g transform="translate(100, 100)">
+    <ellipse cx="0" cy="0" rx="20" ry="15" fill="#8d6e63" opacity="0.8">
+      <animate attributeName="opacity" values="0.8;1;0.8" dur="2s" repeatCount="indefinite"/>
+    </ellipse>
+    <circle cx="-8" cy="-5" r="3" fill="#ff9800" opacity="0.9"/>
+    <circle cx="8" cy="-5" r="3" fill="#ff9800" opacity="0.9"/>
+    <path d="M-15,-10 Q-20,-15 -25,-10 Q-20,-5 -15,-10" fill="#ff5722" opacity="0.8"/>
+    <path d="M15,-10 Q20,-15 25,-10 Q20,-5 15,-10" fill="#ff5722" opacity="0.8"/>
+    <path d="M-10,-15 Q-15,-20 -20,-15 Q-15,-10 -10,-15" fill="#ff5722" opacity="0.8"/>
+    <path d="M10,-15 Q15,-20 20,-15 Q15,-10 10,-15" fill="#ff5722" opacity="0.8"/>
+    <path d="M0,-20 Q-5,-25 -10,-20 Q-5,-15 0,-20" fill="#ff5722" opacity="0.8"/>
+    <path d="M0,-20 Q5,-25 10,-20 Q5,-15 0,-20" fill="#ff5722" opacity="0.8"/>
+  </g>
+</svg>
