@@ -60,7 +60,7 @@ export const Header = () => {
         </div>
         
         <div className="flex flex-1 items-center justify-between space-x-1 sm:space-x-2 md:justify-end">
-          <nav className="flex items-center space-x-0.5 sm:space-x-3 md:space-x-6 text-sm font-medium overflow-x-auto">
+          <nav className="flex items-center space-x-0.5 sm:space-x-3 md:space-x-6 text-sm font-medium overflow-x-auto scrollbar-hide -mx-2 sm:-mx-4 md:mx-0">
             {navItems.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
@@ -72,7 +72,7 @@ export const Header = () => {
                   flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 
                   min-h-[48px] min-w-[48px] sm:min-h-[40px] sm:min-w-auto
                   px-1.5 py-1 sm:px-2 sm:py-1 rounded-lg sm:rounded-md
-                  whitespace-nowrap touch-manipulation
+                  whitespace-nowrap flex-shrink-0 touch-manipulation
                   ${location.pathname === href
                     ? 'text-money-green font-semibold bg-money-green/10 shadow-sm border border-money-green/20' 
                     : 'text-foreground/70 hover:text-foreground hover:bg-accent/50 active:bg-accent/70'
@@ -83,7 +83,7 @@ export const Header = () => {
                 <span className="text-xs leading-none sm:text-sm sm:leading-normal">
                   {/* Show abbreviated labels on mobile */}
                   <span className="sm:hidden">
-                    {label === 'Achievements' ? 'Awards' : label}
+                    {label === 'Achievements' ? 'Awards' : label === 'Notifications' ? 'Alerts' : label === 'Parent' ? 'Parent' : label}
                   </span>
                   <span className="hidden sm:inline">{label}</span>
                 </span>

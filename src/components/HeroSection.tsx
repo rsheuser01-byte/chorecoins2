@@ -8,7 +8,7 @@ export const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative bg-gradient-to-br from-background via-money-light/30 to-background min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex items-center pt-4 sm:pt-0">
+    <section className="relative bg-gradient-to-br from-background via-money-light/30 to-background min-h-[calc(100vh-3.5rem)] sm:min-h-[calc(100vh-4rem)] flex items-center pt-4 sm:pt-0 pb-16">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 items-center">
           <div className="space-y-4 sm:space-y-6 lg:space-y-8">
@@ -68,7 +68,7 @@ export const HeroSection = () => {
           </div>
 
           <div className="relative mt-8 lg:mt-0">
-            <div className="sticky top-[calc(3.5rem+1rem)] sm:top-[calc(4rem+1rem)]">
+            <div className="lg:sticky lg:top-[calc(3.5rem+1rem)] sm:top-[calc(4rem+1rem)]">
               <div className="absolute inset-0 bg-gradient-to-r from-money-green/20 to-money-gold/20 rounded-2xl sm:rounded-3xl transform rotate-3"></div>
               <img 
                 src={heroImage} 

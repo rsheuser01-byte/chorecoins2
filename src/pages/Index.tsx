@@ -15,7 +15,7 @@ const Index = () => {
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-r from-purple-400/10 to-pink-400/10 rounded-full blur-3xl animate-pulse delay-500"></div>
       </div>
       
-      <div className="relative z-10">
+      <div className="relative z-10 overflow-y-auto">
         <div className="container mx-auto px-4 pt-8 max-w-4xl">
           <AnimatedMascot 
             page="home"
