@@ -124,8 +124,16 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
-    touch-action: manipulation;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
     -webkit-tap-highlight-color: transparent;
+  }
+  
+  html {
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
   
   button, a, [role="button"], [role="tab"] {
@@ -237,8 +245,15 @@ All colors MUST be HSL.
   .scrollbar-hide {
     -ms-overflow-style: none;  /* IE and Edge */
     scrollbar-width: none;  /* Firefox */
+    -webkit-overflow-scrolling: touch;
   }
   .scrollbar-hide::-webkit-scrollbar {
     display: none; /* Chrome, Safari, Opera*/
+  }
+  
+  /* Enable horizontal scrolling for navigation on mobile */
+  nav.scrollbar-hide {
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
   }
 }

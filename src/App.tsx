@@ -73,7 +73,7 @@ const RouteChangeHandler = () => {
 };
 
 const AppContent = () => (
-  <div className="min-h-screen bg-background overflow-x-hidden overflow-y-auto">
+  <div className="min-h-screen bg-background overflow-x-hidden">
     <RouteChangeHandler />
     <Header />
     <Routes>

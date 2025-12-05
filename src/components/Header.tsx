@@ -59,8 +59,8 @@ export const Header = () => {
           </div>
         </div>
         
-        <div className="flex flex-1 items-center justify-between space-x-1 sm:space-x-2 md:justify-end">
-          <nav className="flex items-center space-x-0.5 sm:space-x-3 md:space-x-6 text-sm font-medium overflow-x-auto scrollbar-hide -mx-2 sm:-mx-4 md:mx-0">
+        <div className="flex flex-1 items-center justify-between space-x-1 sm:space-x-2 md:justify-end min-w-0">
+          <nav className="flex items-center space-x-0.5 sm:space-x-3 md:space-x-6 text-sm font-medium overflow-x-auto scrollbar-hide -mx-2 sm:-mx-4 md:mx-0 flex-1 min-w-0">
             {navItems.map(({ href, label, icon: Icon }) => (
               <Link
                 key={href}
