@@ -8,9 +8,9 @@ export const HeroSection = () => {
   const navigate = useNavigate();
 
   return (
-    <section className="relative bg-gradient-to-br from-background via-money-light/30 to-background py-8 sm:py-12 lg:min-h-[calc(100vh-3.5rem)] lg:flex lg:items-center" style={{ touchAction: 'pan-y' }}>
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ touchAction: 'pan-y' }}>
-        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 lg:items-center" style={{ touchAction: 'pan-y' }}>
+    <section className="relative bg-gradient-to-br from-background via-money-light/30 to-background py-8 sm:py-12 lg:min-h-[calc(100vh-3.5rem)] lg:flex lg:items-center" style={{ touchAction: 'pan-y', overflow: 'visible', height: 'auto' }}>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8" style={{ touchAction: 'pan-y', overflow: 'visible' }}>
+        <div className="grid lg:grid-cols-2 gap-6 sm:gap-8 lg:gap-12 lg:items-center" style={{ touchAction: 'pan-y', overflow: 'visible' }}>
           <div className="space-y-4 sm:space-y-6 lg:space-y-8" style={{ touchAction: 'pan-y' }}>
             <div className="space-y-3 sm:space-y-4" style={{ touchAction: 'pan-y' }}>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold leading-tight">

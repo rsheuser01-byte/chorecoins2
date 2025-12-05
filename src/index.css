@@ -157,6 +157,12 @@ All colors MUST be HSL.
   .container {
     max-width: 100%;
     overflow-x: hidden;
+    overflow-y: visible;
+  }
+  
+  /* Ensure sections don't create separate scroll containers */
+  section {
+    overflow: visible;
   }
   
   /* Animation for slide-in notifications */
@@ -291,9 +297,19 @@ All colors MUST be HSL.
       touch-action: pan-y manipulation;
     }
     
-    /* Ensure sections allow scrolling */
+    /* Ensure sections allow scrolling and don't create scroll containers */
     section {
       touch-action: pan-y;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    
+    /* Hero section specifically should not create scroll container on mobile */
+    section[class*="HeroSection"],
+    section:has([class*="hero"]) {
+      min-height: auto !important;
+      height: auto !important;
+      overflow: visible !important;
     }
     
     /* Container elements should allow scrolling */
