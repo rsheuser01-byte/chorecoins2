@@ -142,7 +142,7 @@ All colors MUST be HSL.
   }
   
   button, a, [role="button"], [role="tab"] {
-    touch-action: manipulation;
+    touch-action: pan-y manipulation;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
   }
@@ -284,6 +284,31 @@ All colors MUST be HSL.
     div[class*="min-h-screen"] {
       touch-action: pan-y;
       -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Allow scrolling to pass through interactive elements when panning */
+    [class*="cursor-pointer"] {
+      touch-action: pan-y manipulation;
+    }
+    
+    /* Ensure sections allow scrolling */
+    section {
+      touch-action: pan-y;
+    }
+    
+    /* Container elements should allow scrolling */
+    .container {
+      touch-action: pan-y;
+    }
+    
+    /* Buttons should allow scrolling to pass through */
+    button {
+      touch-action: pan-y manipulation;
+    }
+    
+    /* Text content should allow scrolling */
+    h1, h2, h3, h4, h5, h6, p, span, div {
+      touch-action: pan-y;
     }
   }
 }
