@@ -121,19 +121,24 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* Allow natural scrolling on mobile */
+    position: relative;
+    height: 100%;
+  }
+  
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
-    overflow-y: auto;
+    /* Let body scroll naturally - don't force overflow-y */
     -webkit-overflow-scrolling: touch;
-    touch-action: pan-y;
+    /* Allow pan-y for vertical scrolling, pan-x for horizontal when needed */
+    touch-action: pan-y pan-x;
     -webkit-tap-highlight-color: transparent;
-  }
-  
-  html {
-    overflow-x: hidden;
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    position: relative;
+    min-height: 100%;
   }
   
   button, a, [role="button"], [role="tab"] {
@@ -255,5 +260,30 @@ All colors MUST be HSL.
   nav.scrollbar-hide {
     touch-action: pan-x;
     -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Smooth scrolling for better mobile experience */
+  * {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Prevent sticky scrolling issues on mobile */
+  @media (max-width: 768px) {
+    html, body {
+      overscroll-behavior-y: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Ensure fixed elements don't interfere with scrolling */
+    [class*="fixed"] {
+      touch-action: none;
+      pointer-events: none;
+    }
+    
+    /* Allow scrolling on main content */
+    div[class*="min-h-screen"] {
+      touch-action: pan-y;
+      -webkit-overflow-scrolling: touch;
+    }
   }
 }
