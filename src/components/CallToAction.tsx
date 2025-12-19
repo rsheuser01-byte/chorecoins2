@@ -1,11 +1,15 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Coins, Users, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { LoginModal } from '@/components/LoginModal';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const CallToAction = () => {
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   return (
     <section className="py-20 bg-gradient-to-r from-money-green via-success-green to-money-green dark:from-money-green/90 dark:via-success-green/90 dark:to-money-green/90">
@@ -47,28 +51,50 @@ export const CallToAction = () => {
 
             <div className="space-y-4">
               <p className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                🚀 Connect Supabase to unlock the full experience!
+                {isAuthenticated 
+                  ? '🚀 You\'re all set! Start exploring the app!'
+                  : '🚀 Create a free account to save your progress and sync across devices!'
+                }
               </p>
-              <Button 
-                variant="hero" 
-                size="lg" 
-                className="text-lg px-8 py-4 mr-4"
-                onClick={() => navigate('/chores')}
-              >
-                Get Started Free
-              </Button>
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="text-lg px-8 py-4"
-                onClick={() => navigate('/learn')}
-              >
-                Learn More
-              </Button>
+              {isAuthenticated ? (
+                <Button 
+                  variant="hero" 
+                  size="lg" 
+                  className="text-lg px-8 py-4"
+                  onClick={() => navigate('/chores')}
+                >
+                  Go to Chores
+                </Button>
+              ) : (
+                <>
+                  <Button 
+                    variant="hero" 
+                    size="lg" 
+                    className="text-lg px-8 py-4 mr-4"
+                    onClick={() => setShowLoginModal(true)}
+                  >
+                    Get Started Free
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="lg" 
+                    className="text-lg px-8 py-4"
+                    onClick={() => navigate('/learn')}
+                  >
+                    Learn More
+                  </Button>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
+      <LoginModal 
+        isOpen={showLoginModal} 
+        defaultMode="signup"
+        onClose={() => setShowLoginModal(false)} 
+      />
     </section>
   );
 };

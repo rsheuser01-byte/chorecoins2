@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,13 +20,35 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { ColorPicker } from '@/components/ColorPicker';
 import { WeeklySummary } from '@/components/WeeklySummary';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
+import { useSearchParams } from 'react-router-dom';
 
 const Profile = () => {
   const { user, isAuthenticated } = useAuth();
   const { userStats, achievements, recentNotifications, getUnlockedAchievements } = useGamification();
   const { bankAccounts, depositSchedules, addBankAccount, createDepositSchedule } = usePlaid();
   const { theme, toggleTheme, colors, setColors, resetColors } = useTheme();
-  const [selectedTab, setSelectedTab] = useState('overview');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedTab, setSelectedTab] = useState(() => {
+    const tab = searchParams.get('tab');
+    return tab || 'overview';
+  });
+  
+  // Update tab when URL parameter changes
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setSelectedTab(tab);
+    }
+  }, [searchParams]);
+  
+  // Update URL when tab changes
+  useEffect(() => {
+    if (selectedTab && selectedTab !== 'overview') {
+      setSearchParams({ tab: selectedTab });
+    } else {
+      setSearchParams({});
+    }
+  }, [selectedTab, setSearchParams]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   
   // Get chores and weekly allowance for weekly summary

@@ -21,9 +21,10 @@ export const WeeklySummary: React.FC<WeeklySummaryProps> = ({ chores, weeklyAllo
     const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
     const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
     
-    const weekChores = chores.filter((chore: any) => {
+    const weekChores = (chores || []).filter((chore: any) => {
+      if (!chore || !chore.dueDate) return false;
       const choreDate = new Date(chore.dueDate);
-      return choreDate >= weekStart && choreDate <= weekEnd;
+      return !isNaN(choreDate.getTime()) && choreDate >= weekStart && choreDate <= weekEnd;
     });
     
     const completedChores = weekChores.filter((c: any) => c.completed).length;

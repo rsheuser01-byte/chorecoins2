@@ -9,7 +9,11 @@ const Lesson = () => {
   const { moduleId } = useParams<{ moduleId: string }>();
   const navigate = useNavigate();
   
-  const module = learningModules.find(m => m.id === parseInt(moduleId || '0'));
+  // Safely parse moduleId with error handling
+  const parsedModuleId = moduleId ? parseInt(moduleId, 10) : NaN;
+  const module = !isNaN(parsedModuleId) 
+    ? learningModules.find(m => m.id === parsedModuleId)
+    : null;
   
   if (!module) {
     return (

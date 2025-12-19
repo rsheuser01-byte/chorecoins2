@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,17 +20,27 @@ import { useAuth } from '@/contexts/AuthContext';
 interface LoginModalProps {
   isOpen: boolean;
   onClose: () => void;
+  defaultMode?: 'login' | 'signup';
 }
 
-export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
+export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, defaultMode = 'login' }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignup, setIsSignup] = useState(false);
+  const [isSignup, setIsSignup] = useState(defaultMode === 'signup');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const { login, signup } = useAuth();
+
+  // Reset to default mode when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsSignup(defaultMode === 'signup');
+      setError(null);
+      setSuccess(false);
+    }
+  }, [isOpen, defaultMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -18,8 +18,13 @@ export const ParentDashboard = () => {
   
   // Get chores from localStorage (in real app, from API)
   const chores = useMemo(() => {
-    const saved = localStorage.getItem('chores');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('chores');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Error parsing chores from localStorage:', error);
+      return [];
+    }
   }, []);
   
   const todayChores = chores.filter((chore: any) => isToday(new Date(chore.dueDate)));

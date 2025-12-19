@@ -39,11 +39,16 @@ export const MarketSimulator = () => {
   const [selectedStock, setSelectedStock] = useState<Stock | null>(null);
   const [tradeAmount, setTradeAmount] = useState(1);
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
-  const [showTutorial, setShowTutorial] = useState(true);
+  // Check localStorage to see if tutorial was already dismissed
+  const [showTutorial, setShowTutorial] = useState(() => {
+    const dismissed = localStorage.getItem('marketSimulatorTutorialDismissed');
+    return dismissed !== 'true';
+  });
   const [bitcoinInvested, setBitcoinInvested] = useState(false);
   const [totalTrades, setTotalTrades] = useState(0);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [realTradingMode, setRealTradingMode] = useState<'alpaca' | 'coinbase'>('alpaca');
+  // Default to 'simulator' mode so stocks are always visible
+  const [realTradingMode, setRealTradingMode] = useState<'simulator' | 'alpaca' | 'coinbase'>('simulator');
   const [tradingError, setTradingError] = useState<string | null>(null);
   const [alpacaStocks, setAlpacaStocks] = useState<Stock[]>([]);
   const [loadingAlpacaStocks, setLoadingAlpacaStocks] = useState(false);
@@ -75,14 +80,48 @@ export const MarketSimulator = () => {
     }
   };
 
-  const displayStocks = realTradingMode === 'alpaca' ? alpacaStocks : stocks;
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+    // Persist the dismissal in localStorage so it doesn't show again
+    localStorage.setItem('marketSimulatorTutorialDismissed', 'true');
+  };
+
+  // Use stocks based on selected mode, fallback to simulator stocks if needed
+  const displayStocks = (realTradingMode === 'alpaca' && alpaca.isConnected && alpacaStocks.length > 0) 
+    ? alpacaStocks 
+    : stocks; // Always use simulator stocks for 'simulator' mode or as fallback
 
   const handleTrade = async () => {
     if (!selectedStock || tradeAmount <= 0) return;
 
     setTradingError(null);
 
-    if (realTradingMode === 'alpaca' && alpaca.isConnected) {
+    if (realTradingMode === 'simulator') {
+      // Simulator mode - use local market data
+      const success = tradeType === 'buy' 
+        ? buyStock(selectedStock.symbol, tradeAmount)
+        : sellStock(selectedStock.symbol, tradeAmount);
+      
+      if (success) {
+        setTotalTrades(prev => prev + 1);
+        
+        // Check if Bitcoin was invested
+        if (selectedStock.symbol.includes('BTC') && tradeType === 'buy') {
+          setBitcoinInvested(true);
+        }
+        
+        // Show success message
+        setShowSuccess(true);
+        setTimeout(() => setShowSuccess(false), 3000);
+        
+        setSelectedStock(null);
+        setTradeAmount(1);
+      } else {
+        setTradingError(tradeType === 'buy' 
+          ? 'Not enough cash to buy this stock' 
+          : 'Not enough shares to sell');
+      }
+    } else if (realTradingMode === 'alpaca' && alpaca.isConnected) {
       // Real trading with Alpaca paper account
       try {
         const orderFunc = tradeType === 'buy' ? alpaca.buyStock : alpaca.sellStock;
@@ -166,8 +205,19 @@ export const MarketSimulator = () => {
     <div className="space-y-6">
       {/* Tutorial Modal */}
       {showTutorial && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl mx-4">
+        <div 
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          onClick={(e) => {
+            // Close tutorial when clicking outside the card
+            if (e.target === e.currentTarget) {
+              handleTutorialClose();
+            }
+          }}
+        >
+          <Card 
+            className="w-full max-w-2xl mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
             <CardHeader className="text-center">
               <CardTitle className="text-2xl flex items-center justify-center gap-2 text-gray-900 dark:text-white">
                 🎮 Welcome to the Investment Adventure!
@@ -193,7 +243,11 @@ export const MarketSimulator = () => {
                   <li>• Learn about different types of investments</li>
                 </ul>
               </div>
-              <Button onClick={() => setShowTutorial(false)} className="w-full">
+              <Button 
+                onClick={handleTutorialClose} 
+                className="w-full"
+                type="button"
+              >
                 <Zap className="h-4 w-4 mr-2" />
                 Start Investing Adventure!
               </Button>
@@ -228,6 +282,15 @@ export const MarketSimulator = () => {
       <div className="flex justify-center">
         <div className="bg-muted/50 rounded-lg p-1 flex gap-1">
           <Button
+            variant={realTradingMode === 'simulator' ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setRealTradingMode('simulator')}
+            className="text-xs sm:text-sm"
+          >
+            <Zap className="h-4 w-4 mr-1" />
+            Simulator
+          </Button>
+          <Button
             variant={realTradingMode === 'alpaca' ? "default" : "ghost"}
             size="sm"
             onClick={() => setRealTradingMode('alpaca')}
@@ -251,6 +314,15 @@ export const MarketSimulator = () => {
       </div>
 
       {/* Trading Mode Alert */}
+      {realTradingMode === 'simulator' && (
+        <Alert className="border-green-200 bg-green-50 dark:bg-green-950/20">
+          <Zap className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800 dark:text-green-200">
+            <strong>Simulator Mode:</strong> Practice trading with virtual money! 
+            Start with $10,000 and learn how to invest in stocks and Bitcoin. Perfect for learning!
+          </AlertDescription>
+        </Alert>
+      )}
       {realTradingMode === 'alpaca' && (
         <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
           <BarChart3 className="h-4 w-4 text-blue-600" />
@@ -313,15 +385,15 @@ export const MarketSimulator = () => {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <IllustratedStatCard
               title="💰 Money to Spend"
-              value={`$${realTradingMode === 'alpaca' ? alpaca.cash.toFixed(2) : marketCash.toFixed(2)}`}
-              subtitle={realTradingMode === 'alpaca' ? 'Paper trading cash' : 'Virtual money to invest'}
+              value={`$${realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash.toFixed(2) : marketCash.toFixed(2)}`}
+              subtitle={realTradingMode === 'alpaca' && alpaca.isConnected ? 'Paper trading cash' : 'Virtual money to invest'}
               emoji="💵"
               illustration="coins"
             />
 
             <IllustratedStatCard
               title="💎 My Collection Value"
-              value={`$${realTradingMode === 'alpaca' ? alpaca.portfolioValue.toFixed(2) : portfolioValue.toFixed(2)}`}
+              value={`$${realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.portfolioValue.toFixed(2) : portfolioValue.toFixed(2)}`}
               subtitle="Stocks & crypto value"
               emoji="📊"
               illustration="treasure"
@@ -330,7 +402,7 @@ export const MarketSimulator = () => {
 
             <IllustratedStatCard
               title="🌱 How Much I Grew"
-              value={`$${(realTradingMode === 'alpaca' ? alpaca.portfolioChange : totalReturn).toFixed(2)}`}
+              value={`$${(realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.portfolioChange : totalReturn).toFixed(2)}`}
               subtitle={`${totalReturn >= 0 ? '+' : ''}${totalReturnPercent.toFixed(1)}%`}
               emoji="📈"
               illustration="growth"
@@ -339,7 +411,7 @@ export const MarketSimulator = () => {
 
             <IllustratedStatCard
               title="🏆 Everything I Have"
-              value={`$${realTradingMode === 'alpaca' ? alpaca.totalPortfolioValue.toFixed(2) : totalPortfolioValue.toFixed(2)}`}
+              value={`$${realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.totalPortfolioValue.toFixed(2) : totalPortfolioValue.toFixed(2)}`}
               subtitle="Cash + investments"
               emoji="👑"
               illustration="trophy"
@@ -442,7 +514,7 @@ export const MarketSimulator = () => {
                   <div className="flex justify-between text-sm font-medium">
                     <span>Total cost: ${(selectedStock.price * tradeAmount).toFixed(2)}</span>
                     {tradeType === 'buy' && (
-                      <span>Max affordable: {(marketCash / selectedStock.price).toFixed(4)}</span>
+                      <span>Max affordable: {((realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash) / selectedStock.price).toFixed(4)}</span>
                     )}
                   </div>
                 </div>
@@ -455,7 +527,10 @@ export const MarketSimulator = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setTradeAmount(marketCash / selectedStock.price * 0.25)}
+                      onClick={() => {
+                        const availableCash = realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash;
+                        setTradeAmount(availableCash / selectedStock.price * 0.25);
+                      }}
                       className="hover:bg-blue-50"
                     >
                       25%
@@ -463,7 +538,10 @@ export const MarketSimulator = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setTradeAmount(marketCash / selectedStock.price * 0.5)}
+                      onClick={() => {
+                        const availableCash = realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash;
+                        setTradeAmount(availableCash / selectedStock.price * 0.5);
+                      }}
                       className="hover:bg-blue-50"
                     >
                       50%
@@ -471,7 +549,10 @@ export const MarketSimulator = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setTradeAmount(marketCash / selectedStock.price * 0.75)}
+                      onClick={() => {
+                        const availableCash = realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash;
+                        setTradeAmount(availableCash / selectedStock.price * 0.75);
+                      }}
                       className="hover:bg-blue-50"
                     >
                       75%
@@ -479,7 +560,10 @@ export const MarketSimulator = () => {
                     <Button 
                       variant="outline" 
                       size="sm"
-                      onClick={() => setTradeAmount(marketCash / selectedStock.price)}
+                      onClick={() => {
+                        const availableCash = realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash;
+                        setTradeAmount(availableCash / selectedStock.price);
+                      }}
                       className="hover:bg-blue-50"
                     >
                       Max
@@ -534,7 +618,7 @@ export const MarketSimulator = () => {
                 variant="default"
                 disabled={
                   tradeAmount <= 0 || 
-                  (tradeType === 'buy' && marketCash < selectedStock.price * tradeAmount) ||
+                  (tradeType === 'buy' && (realTradingMode === 'alpaca' && alpaca.isConnected ? alpaca.cash : marketCash) < selectedStock.price * tradeAmount) ||
                   (tradeType === 'sell' && selectedStock.owned < tradeAmount)
                 }
               >

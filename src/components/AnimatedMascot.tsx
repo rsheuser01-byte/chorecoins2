@@ -378,6 +378,7 @@ export const AnimatedMascot: React.FC<AnimatedMascotProps> = ({
                   onClick={handleMascotClick}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  style={{ touchAction: 'manipulation' }}
                 >
                   <motion.div
                     className="relative"

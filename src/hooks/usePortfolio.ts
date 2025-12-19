@@ -15,13 +15,23 @@ export interface PortfolioItem {
 
 export const usePortfolio = () => {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
-    const saved = localStorage.getItem('portfolio');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Savings Account', value: 250, allocation: 50, change: 2.3, color: 'money-green' },
-      { id: '2', name: 'Stock Market Index', value: 150, allocation: 30, change: 8.7, color: 'crypto-orange' },
-      { id: '3', name: 'Bitcoin', value: 75, allocation: 15, change: 15.2, color: 'bitcoin-orange' },
-      { id: '4', name: 'Emergency Fund', value: 25, allocation: 5, change: 1.1, color: 'money-gold' },
-    ];
+    try {
+      const saved = localStorage.getItem('portfolio');
+      return saved ? JSON.parse(saved) : [
+        { id: '1', name: 'Savings Account', value: 250, allocation: 50, change: 2.3, color: 'money-green' },
+        { id: '2', name: 'Stock Market Index', value: 150, allocation: 30, change: 8.7, color: 'crypto-orange' },
+        { id: '3', name: 'Bitcoin', value: 75, allocation: 15, change: 15.2, color: 'bitcoin-orange' },
+        { id: '4', name: 'Emergency Fund', value: 25, allocation: 5, change: 1.1, color: 'money-gold' },
+      ];
+    } catch (error) {
+      console.error('Error parsing portfolio from localStorage:', error);
+      return [
+        { id: '1', name: 'Savings Account', value: 250, allocation: 50, change: 2.3, color: 'money-green' },
+        { id: '2', name: 'Stock Market Index', value: 150, allocation: 30, change: 8.7, color: 'crypto-orange' },
+        { id: '3', name: 'Bitcoin', value: 75, allocation: 15, change: 15.2, color: 'bitcoin-orange' },
+        { id: '4', name: 'Emergency Fund', value: 25, allocation: 5, change: 1.1, color: 'money-gold' },
+      ];
+    }
   });
 
   const [cash, setCash] = useState(() => {
@@ -30,13 +40,23 @@ export const usePortfolio = () => {
   });
 
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(() => {
-    const saved = localStorage.getItem('savingsGoals');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('savingsGoals');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Error parsing savings goals from localStorage:', error);
+      return [];
+    }
   });
 
   const [spendingTransactions, setSpendingTransactions] = useState<SpendingTransaction[]>(() => {
-    const saved = localStorage.getItem('spendingTransactions');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('spendingTransactions');
+      return saved ? JSON.parse(saved) : [];
+    } catch (error) {
+      console.error('Error parsing spending transactions from localStorage:', error);
+      return [];
+    }
   });
 
   useEffect(() => {

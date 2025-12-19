@@ -39,8 +39,13 @@ export const useCoinbase = () => {
   });
 
   const [credentials, setCredentials] = useState<CoinbaseCredentials | null>(() => {
-    const saved = localStorage.getItem('coinbaseCredentials');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('coinbaseCredentials');
+      return saved ? JSON.parse(saved) : null;
+    } catch (error) {
+      console.error('Error parsing Coinbase credentials from localStorage:', error);
+      return null;
+    }
   });
 
   // Initialize API connection
