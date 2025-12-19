@@ -281,9 +281,21 @@ All colors MUST be HSL.
     }
     
     /* Ensure fixed elements don't interfere with scrolling */
-    [class*="fixed"] {
+    /* But allow modals, dialogs, and high z-index overlays to be interactive */
+    [class*="fixed"]:not([role="dialog"]):not([data-modal]):not([data-dialog]) {
       touch-action: none;
       pointer-events: none;
+    }
+    
+    /* Explicitly allow modals and dialogs to be interactive */
+    [role="dialog"],
+    [data-modal],
+    [data-dialog],
+    .fixed[style*="pointer-events: auto"],
+    .fixed.z-50,
+    .fixed.z-\[50\] {
+      pointer-events: auto !important;
+      touch-action: manipulation !important;
     }
     
     /* Allow scrolling on main content */

@@ -207,16 +207,25 @@ export const MarketSimulator = () => {
       {showTutorial && (
         <div 
           className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          role="dialog"
+          aria-modal="true"
+          style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
           onClick={(e) => {
             // Close tutorial when clicking outside the card
             if (e.target === e.currentTarget) {
               handleTutorialClose();
             }
           }}
+          onTouchStart={(e) => {
+            // Prevent event from bubbling to parent
+            e.stopPropagation();
+          }}
         >
           <Card 
             className="w-full max-w-2xl mx-4"
+            style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
             onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
           >
             <CardHeader className="text-center">
               <CardTitle className="text-2xl flex items-center justify-center gap-2 text-gray-900 dark:text-white">
@@ -244,9 +253,19 @@ export const MarketSimulator = () => {
                 </ul>
               </div>
               <Button 
-                onClick={handleTutorialClose} 
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleTutorialClose();
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  handleTutorialClose();
+                }}
                 className="w-full"
                 type="button"
+                style={{ pointerEvents: 'auto', touchAction: 'manipulation' }}
               >
                 <Zap className="h-4 w-4 mr-2" />
                 Start Investing Adventure!
