@@ -66,33 +66,60 @@ export default function Notifications() {
   };
 
   const savePreferences = async () => {
-    if (!supabase) return;
+    if (!supabase) {
+      toast({
+        title: "Error",
+        description: "Database connection not available.",
+        variant: "destructive",
+      });
+      return;
+    }
     try {
       setLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error('Not authenticated. Please log in.');
+      }
+      
+      if (!user) {
+        throw new Error('No user found. Please log in.');
+      }
 
-      const { error } = await supabase
+      // Format reminder_time to include seconds (HH:MM:SS format for TIME type)
+      const reminderTimeFormatted = preferences.reminder_time.includes(':') 
+        ? `${preferences.reminder_time}:00` 
+        : `${preferences.reminder_time}:00:00`;
+
+      const { error, data } = await supabase
         .from('notification_preferences')
         .upsert({
           user_id: user.id,
           chore_reminders_enabled: preferences.chore_reminders_enabled,
-          reminder_time: preferences.reminder_time,
+          reminder_time: reminderTimeFormatted,
           reminder_days: preferences.reminder_days,
           push_enabled: preferences.push_enabled,
-        });
+        }, {
+          onConflict: 'user_id'
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
 
       toast({
         title: "Settings Saved",
         description: "Your notification preferences have been updated.",
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving preferences:', error);
+      const errorMessage = error?.message || error?.details || 'Failed to save preferences.';
       toast({
         title: "Error",
-        description: "Failed to save preferences.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
