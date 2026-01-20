@@ -62,7 +62,7 @@ export const usePushNotifications = () => {
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
-          'BCJ8ylekHp0_kee88jzNq5PUWSO9HKC0msfHdpccqvnqU_jKfJSmXDa4dbiekETKmNkVgNdIe7BctLna3tXdLzk'
+          'BDB0RlmKPENQFg4B1i1s1nHUpu4_3tlpP6YRa5F4VTtjG6jA6qklatodiP_Xs_U3XSOAExXof4d75XARTH9hg_g'
         )
       });
 

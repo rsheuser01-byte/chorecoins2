@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // VAPID public key (matches the one in frontend)
-const VAPID_PUBLIC_KEY = 'BCJ8ylekHp0_kee88jzNq5PUWSO9HKC0msfHdpccqvnqU_jKfJSmXDa4dbiekETKmNkVgNdIe7BctLna3tXdLzk';
+const VAPID_PUBLIC_KEY = 'BDB0RlmKPENQFg4B1i1s1nHUpu4_3tlpP6YRa5F4VTtjG6jA6qklatodiP_Xs_U3XSOAExXof4d75XARTH9hg_g';
 
 // Helper function to convert base64url to Uint8Array
 function base64UrlToUint8Array(base64Url: string): Uint8Array {
@@ -28,7 +28,7 @@ function uint8ArrayToBase64Url(uint8Array: Uint8Array): string {
 }
 
 // Create JWT for VAPID authentication
-async function createVapidJwt(audience: string, subject: string, privateKeyBase64: string): Promise<string> {
+async function createVapidJwt(audience: string, subject: string, privateJwk: JsonWebKey): Promise<string> {
   const header = { alg: 'ES256', typ: 'JWT' };
   const now = Math.floor(Date.now() / 1000);
   const payload = {
@@ -41,11 +41,9 @@ async function createVapidJwt(audience: string, subject: string, privateKeyBase6
   const payloadB64 = uint8ArrayToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
   const unsignedToken = `${headerB64}.${payloadB64}`;
 
-  // Import the private key
-  const privateKeyBytes = base64UrlToUint8Array(privateKeyBase64);
   const key = await crypto.subtle.importKey(
-    'raw',
-    privateKeyBytes,
+    'jwk',
+    privateJwk,
     { name: 'ECDSA', namedCurve: 'P-256' },
     false,
     ['sign']
@@ -66,14 +64,14 @@ async function createVapidJwt(audience: string, subject: string, privateKeyBase6
 async function sendPushNotification(
   subscription: { endpoint: string; keys: { p256dh: string; auth: string } },
   payload: string,
-  vapidPrivateKey: string,
+  vapidPrivateJwk: JsonWebKey,
   vapidSubject: string
 ): Promise<void> {
   const endpoint = new URL(subscription.endpoint);
   const audience = `${endpoint.protocol}//${endpoint.host}`;
 
   // Create VAPID JWT
-  const jwt = await createVapidJwt(audience, vapidSubject, vapidPrivateKey);
+  const jwt = await createVapidJwt(audience, vapidSubject, vapidPrivateJwk);
 
   // Encrypt the payload using the subscription keys
   const p256dhKey = base64UrlToUint8Array(subscription.keys.p256dh);
@@ -234,10 +232,39 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY')!;
-    const vapidSubject = Deno.env.get('VAPID_SUBJECT')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+    const vapidPrivateJwkRaw = Deno.env.get('VAPID_PRIVATE_JWK') || '';
+    const vapidSubject = Deno.env.get('VAPID_SUBJECT') || '';
+
+    let vapidPrivateJwk: JsonWebKey | null = null;
+    if (vapidPrivateJwkRaw) {
+      try {
+        vapidPrivateJwk = JSON.parse(vapidPrivateJwkRaw);
+      } catch (error) {
+        console.error('Invalid VAPID private JWK JSON', error);
+      }
+    }
+
+    if (!supabaseUrl || !supabaseKey || !vapidPrivateJwk || !vapidPrivateJwk.d || !vapidSubject) {
+      console.error('Missing required env vars for push notifications', {
+        hasSupabaseUrl: !!supabaseUrl,
+        hasServiceRoleKey: !!supabaseKey,
+        hasVapidPrivateJwk: !!vapidPrivateJwk,
+        hasVapidPrivateJwkD: !!vapidPrivateJwk?.d,
+        hasVapidSubject: !!vapidSubject,
+      });
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required environment variables for push notifications',
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        }
+      );
+    }
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
@@ -358,7 +385,7 @@ serve(async (req) => {
             await sendPushNotification(
               pref.push_subscription,
               JSON.stringify(notificationPayload),
-              vapidPrivateKey,
+              vapidPrivateJwk,
               vapidSubject
             );
             console.log(`✅ Successfully sent push to user ${pref.user_id}`);
