@@ -30,8 +30,10 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [isResetMode, setIsResetMode] = useState(false);
+  const [resetSuccess, setResetSuccess] = useState(false);
 
-  const { login, signup } = useAuth();
+  const { login, signup, resetPassword } = useAuth();
 
   // Reset to default mode when modal opens
   useEffect(() => {
@@ -39,6 +41,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
       setIsSignup(defaultMode === 'signup');
       setError(null);
       setSuccess(false);
+      setIsResetMode(false);
+      setResetSuccess(false);
     }
   }, [isOpen, defaultMode]);
 
@@ -86,6 +90,36 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!email.trim()) {
+      setError('Please enter your email');
+      return;
+    }
+
+    if (!email.includes('@')) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await resetPassword(email.trim());
+      if (result.success) {
+        setResetSuccess(true);
+      } else {
+        setError(result.error || 'Unable to send reset email.');
+      }
+    } catch (error) {
+      setError('An error occurred. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleClose = () => {
     if (!isLoading) {
       onClose();
@@ -94,6 +128,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
       setError(null);
       setSuccess(false);
       setIsSignup(false);
+      setIsResetMode(false);
+      setResetSuccess(false);
     }
   };
 
@@ -123,6 +159,74 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
               You're all set to start earning coins and completing chores!
             </p>
           </div>
+        ) : isResetMode ? (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {resetSuccess ? (
+              <div className="text-center py-4">
+                <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">
+                  Password reset email sent. Check your inbox.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    disabled={isLoading}
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+            )}
+
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading || !email.trim() || resetSuccess}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending email...
+                </>
+              ) : (
+                <>
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Send Reset Email
+                </>
+              )}
+            </Button>
+
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetMode(false);
+                  setError(null);
+                  setResetSuccess(false);
+                }}
+                className="text-sm text-primary hover:underline"
+                disabled={isLoading}
+              >
+                Back to sign in
+              </button>
+            </div>
+          </form>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
@@ -183,6 +287,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
                 </>
               )}
             </Button>
+
+            {!isSignup && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetMode(true);
+                    setError(null);
+                    setResetSuccess(false);
+                  }}
+                  className="text-sm text-primary hover:underline"
+                  disabled={isLoading}
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
 
             <div className="text-center">
               <button

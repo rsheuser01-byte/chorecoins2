@@ -22,6 +22,7 @@ import Notifications from "./pages/Notifications";
 import TermsOfUse from "./pages/TermsOfUse";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,7 @@ const AppContent = () => (
       <Route path="/achievements" element={<Achievements />} />
       <Route path="/parent" element={<ParentDashboard />} />
       <Route path="/notifications" element={<Notifications />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/terms" element={<TermsOfUse />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="*" element={<NotFound />} />
