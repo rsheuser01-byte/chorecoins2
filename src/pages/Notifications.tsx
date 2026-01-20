@@ -24,11 +24,15 @@ export default function Notifications() {
   const { permission, isSupported, requestPermission, unsubscribe } = usePushNotifications();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const timezoneOffsetMinutes = new Date().getTimezoneOffset();
+  const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [preferences, setPreferences] = useState({
     chore_reminders_enabled: true,
     reminder_time: '09:00',
     reminder_days: [1, 2, 3, 4, 5, 6, 7],
     push_enabled: false,
+    timezone_offset_minutes: timezoneOffsetMinutes,
+    timezone: timezoneName,
   });
 
   useEffect(() => {
@@ -58,6 +62,8 @@ export default function Notifications() {
           reminder_time: data.reminder_time.substring(0, 5),
           reminder_days: data.reminder_days || [1, 2, 3, 4, 5, 6, 7],
           push_enabled: data.push_enabled,
+          timezone_offset_minutes: data.timezone_offset_minutes ?? timezoneOffsetMinutes,
+          timezone: data.timezone || timezoneName,
         });
       }
     } catch (error) {
@@ -100,6 +106,8 @@ export default function Notifications() {
           reminder_time: reminderTimeFormatted,
           reminder_days: preferences.reminder_days,
           push_enabled: preferences.push_enabled,
+          timezone_offset_minutes: preferences.timezone_offset_minutes,
+          timezone: preferences.timezone,
         }, {
           onConflict: 'user_id'
         })

@@ -241,18 +241,12 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get current time info
     const now = new Date();
-    const currentHour = now.getHours();
-    const currentMinute = now.getMinutes();
-    const currentDay = now.getDay() === 0 ? 7 : now.getDay();
-
-    console.log(`Checking reminders at ${currentHour}:${currentMinute} on day ${currentDay}`);
 
     // Get all users who should receive reminders
     const { data: preferences, error: prefsError } = await supabase
       .from('notification_preferences')
-      .select('user_id, reminder_time, reminder_days, push_subscription')
+      .select('user_id, reminder_time, reminder_days, push_subscription, timezone_offset_minutes')
       .eq('chore_reminders_enabled', true)
       .eq('push_enabled', true);
 
@@ -269,6 +263,17 @@ serve(async (req) => {
 
     for (const pref of preferences || []) {
       try {
+        const offsetMinutes = typeof pref.timezone_offset_minutes === 'number'
+          ? pref.timezone_offset_minutes
+          : 0;
+        const localNow = new Date(now.getTime() - offsetMinutes * 60 * 1000);
+        const currentHour = localNow.getHours();
+        const currentMinute = localNow.getMinutes();
+        const currentDay = localNow.getDay() === 0 ? 7 : localNow.getDay();
+
+        console.log(
+          `Checking reminders at ${currentHour}:${currentMinute} on day ${currentDay} (offset ${offsetMinutes})`
+        );
         // Check if today is in the user's reminder days
         if (!pref.reminder_days || !pref.reminder_days.includes(currentDay)) {
           skippedCount++;
@@ -334,8 +339,8 @@ serve(async (req) => {
       sent: sentCount,
       skipped: skippedCount,
       errors: errorCount,
-      time: `${currentHour}:${currentMinute}`,
-      day: currentDay
+      time: `${now.getUTCHours()}:${now.getUTCMinutes()}`,
+      day: now.getUTCDay()
     };
 
     console.log('Result:', result);
