@@ -261,18 +261,62 @@ serve(async (req) => {
     let skippedCount = 0;
     let errorCount = 0;
 
+    const getLocalTimeParts = (date: Date, timezone?: string) => {
+      if (!timezone) {
+        return null;
+      }
+
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        weekday: 'short'
+      });
+
+      const parts = formatter.formatToParts(date);
+      const hour = Number(parts.find(part => part.type === 'hour')?.value);
+      const minute = Number(parts.find(part => part.type === 'minute')?.value);
+      const weekday = parts.find(part => part.type === 'weekday')?.value || '';
+
+      if (Number.isNaN(hour) || Number.isNaN(minute)) {
+        return null;
+      }
+
+      const weekdayMap: Record<string, number> = {
+        Sun: 7,
+        Mon: 1,
+        Tue: 2,
+        Wed: 3,
+        Thu: 4,
+        Fri: 5,
+        Sat: 6
+      };
+
+      const day = weekdayMap[weekday];
+      if (!day) {
+        return null;
+      }
+
+      return { hour, minute, day };
+    };
+
     for (const pref of preferences || []) {
       try {
+        const timezone = typeof pref.timezone === 'string' ? pref.timezone : '';
         const offsetMinutes = typeof pref.timezone_offset_minutes === 'number'
           ? pref.timezone_offset_minutes
           : 0;
-        const localNow = new Date(now.getTime() - offsetMinutes * 60 * 1000);
-        const currentHour = localNow.getHours();
-        const currentMinute = localNow.getMinutes();
-        const currentDay = localNow.getDay() === 0 ? 7 : localNow.getDay();
+
+        const zonedParts = getLocalTimeParts(now, timezone);
+        const fallbackNow = new Date(now.getTime() - offsetMinutes * 60 * 1000);
+
+        const currentHour = zonedParts?.hour ?? fallbackNow.getHours();
+        const currentMinute = zonedParts?.minute ?? fallbackNow.getMinutes();
+        const currentDay = zonedParts?.day ?? (fallbackNow.getDay() === 0 ? 7 : fallbackNow.getDay());
 
         console.log(
-          `Checking reminders at ${currentHour}:${currentMinute} on day ${currentDay} (offset ${offsetMinutes})`
+          `Checking reminders at ${currentHour}:${currentMinute} on day ${currentDay} (tz ${timezone || 'offset'} ${offsetMinutes})`
         );
         // Check if today is in the user's reminder days
         if (!pref.reminder_days || !pref.reminder_days.includes(currentDay)) {

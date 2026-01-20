@@ -97,6 +97,8 @@ export default function Notifications() {
       const reminderTimeFormatted = preferences.reminder_time.includes(':') 
         ? `${preferences.reminder_time}:00` 
         : `${preferences.reminder_time}:00:00`;
+      const currentOffsetMinutes = new Date().getTimezoneOffset();
+      const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
       const { error, data } = await supabase
         .from('notification_preferences')
@@ -106,8 +108,8 @@ export default function Notifications() {
           reminder_time: reminderTimeFormatted,
           reminder_days: preferences.reminder_days,
           push_enabled: preferences.push_enabled,
-          timezone_offset_minutes: preferences.timezone_offset_minutes,
-          timezone: preferences.timezone,
+          timezone_offset_minutes: currentOffsetMinutes,
+          timezone: currentTimezone,
         }, {
           onConflict: 'user_id'
         })
