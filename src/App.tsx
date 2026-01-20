@@ -26,6 +26,22 @@ import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
 
+const AuthHashRedirect = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    const hash = window.location.hash || "";
+    const hasAccessToken = hash.includes("access_token");
+
+    if (hasAccessToken && location.pathname !== "/reset-password") {
+      const newUrl = `/reset-password${hash}`;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, [location.pathname]);
+
+  return null;
+};
+
 // Component to handle route changes and prevent sounds
 const RouteChangeHandler = () => {
   const location = useLocation();
@@ -75,6 +91,7 @@ const RouteChangeHandler = () => {
 
 const AppContent = () => (
   <div className="min-h-screen bg-background overflow-x-hidden" style={{ touchAction: 'pan-y' }}>
+    <AuthHashRedirect />
     <RouteChangeHandler />
     <Header />
     <Routes>
