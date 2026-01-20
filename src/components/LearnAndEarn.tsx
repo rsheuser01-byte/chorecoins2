@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, CheckCircle, PlayCircle, DollarSign, Zap, Star, Trophy, Sparkles } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 interface Lesson {
   id: string;
@@ -41,7 +42,7 @@ export const LearnAndEarn = () => {
   };
 
   const [lessons, setLessons] = useState<Lesson[]>(() => {
-    const saved = localStorage.getItem('learnEarnLessons');
+    const saved = safeLocalStorage.getItem('learnEarnLessons');
     return saved ? JSON.parse(saved) : [
       {
         id: '1',
@@ -210,18 +211,18 @@ Many brokerages offer automatic DCA plans where they invest for you monthly.`,
 
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [totalEarnings, setTotalEarnings] = useState(() => {
-    const saved = localStorage.getItem('learnEarnTotal');
+    const saved = safeLocalStorage.getItem('learnEarnTotal');
     return saved ? parseFloat(saved) : 0;
   });
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('learnEarnLessons', JSON.stringify(lessons));
+    safeLocalStorage.setItem('learnEarnLessons', JSON.stringify(lessons));
   }, [lessons]);
 
   useEffect(() => {
-    localStorage.setItem('learnEarnTotal', totalEarnings.toString());
+    safeLocalStorage.setItem('learnEarnTotal', totalEarnings.toString());
   }, [totalEarnings]);
 
   const startLesson = (lesson: Lesson) => {

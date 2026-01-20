@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from './LoginModal';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
 
   const handleContinueAsGuest = () => {
     if (dontShowAgain) {
-      localStorage.setItem('welcomeModalDismissed', 'true');
+      safeLocalStorage.setItem('welcomeModalDismissed', 'true');
     }
     onContinueAsGuest();
     onClose();

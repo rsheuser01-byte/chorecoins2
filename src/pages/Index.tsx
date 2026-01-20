@@ -6,6 +6,7 @@ import { CallToAction } from '@/components/CallToAction';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { useAuth } from '@/contexts/AuthContext';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 const Index = () => {
   const { isAuthenticated, isLoading } = useAuth();
@@ -18,9 +19,9 @@ const Index = () => {
     // 3. User hasn't dismissed it before
     // 4. User hasn't created any data yet (first-time user)
     if (!isLoading && !isAuthenticated) {
-      const dismissed = localStorage.getItem('welcomeModalDismissed');
-      const hasUserStats = localStorage.getItem('userStats');
-      const hasChores = localStorage.getItem('chores');
+      const dismissed = safeLocalStorage.getItem('welcomeModalDismissed');
+      const hasUserStats = safeLocalStorage.getItem('userStats');
+      const hasChores = safeLocalStorage.getItem('chores');
       
       // Show if not dismissed and no data exists (true first-time user)
       if (!dismissed && !hasUserStats && !hasChores) {

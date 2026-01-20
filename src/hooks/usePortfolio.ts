@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { SavingsGoal } from '@/components/SavingsGoals';
 import type { SpendingTransaction } from '@/components/SpendingTracker';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface PortfolioItem {
   id: string;
@@ -16,7 +17,7 @@ export interface PortfolioItem {
 export const usePortfolio = () => {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
     try {
-      const saved = localStorage.getItem('portfolio');
+      const saved = safeLocalStorage.getItem('portfolio');
       return saved ? JSON.parse(saved) : [
         { id: '1', name: 'Savings Account', value: 250, allocation: 50, change: 2.3, color: 'money-green' },
         { id: '2', name: 'Stock Market Index', value: 150, allocation: 30, change: 8.7, color: 'crypto-orange' },
@@ -35,13 +36,13 @@ export const usePortfolio = () => {
   });
 
   const [cash, setCash] = useState(() => {
-    const saved = localStorage.getItem('cash');
+    const saved = safeLocalStorage.getItem('cash');
     return saved ? parseFloat(saved) : 1000;
   });
 
   const [savingsGoals, setSavingsGoals] = useState<SavingsGoal[]>(() => {
     try {
-      const saved = localStorage.getItem('savingsGoals');
+      const saved = safeLocalStorage.getItem('savingsGoals');
       return saved ? JSON.parse(saved) : [];
     } catch (error) {
       console.error('Error parsing savings goals from localStorage:', error);
@@ -51,7 +52,7 @@ export const usePortfolio = () => {
 
   const [spendingTransactions, setSpendingTransactions] = useState<SpendingTransaction[]>(() => {
     try {
-      const saved = localStorage.getItem('spendingTransactions');
+      const saved = safeLocalStorage.getItem('spendingTransactions');
       return saved ? JSON.parse(saved) : [];
     } catch (error) {
       console.error('Error parsing spending transactions from localStorage:', error);
@@ -60,19 +61,19 @@ export const usePortfolio = () => {
   });
 
   useEffect(() => {
-    localStorage.setItem('portfolio', JSON.stringify(portfolio));
+    safeLocalStorage.setItem('portfolio', JSON.stringify(portfolio));
   }, [portfolio]);
 
   useEffect(() => {
-    localStorage.setItem('cash', cash.toString());
+    safeLocalStorage.setItem('cash', cash.toString());
   }, [cash]);
 
   useEffect(() => {
-    localStorage.setItem('savingsGoals', JSON.stringify(savingsGoals));
+    safeLocalStorage.setItem('savingsGoals', JSON.stringify(savingsGoals));
   }, [savingsGoals]);
 
   useEffect(() => {
-    localStorage.setItem('spendingTransactions', JSON.stringify(spendingTransactions));
+    safeLocalStorage.setItem('spendingTransactions', JSON.stringify(spendingTransactions));
   }, [spendingTransactions]);
 
   const addToPortfolio = (item: Omit<PortfolioItem, 'id'>) => {

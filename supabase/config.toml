@@ -26,3 +26,6 @@ verify_jwt = true
 
 [functions.generate-sound-effect]
 verify_jwt = true
+
+[functions.send-chore-reminders]
+verify_jwt = false

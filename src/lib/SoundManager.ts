@@ -27,6 +27,8 @@ interface SoundPreset {
   pitch?: number;
 }
 
+import { safeLocalStorage } from "@/lib/safeLocalStorage";
+
 export class SoundManager {
   private sounds: Map<string, HTMLAudioElement[]> = new Map();
   private audioContext: AudioContext | null = null;
@@ -117,12 +119,12 @@ export class SoundManager {
   }
 
   private loadMuteState() {
-    const saved = localStorage.getItem('soundMuted');
+    const saved = safeLocalStorage.getItem('soundMuted');
     this.isMuted = saved ? JSON.parse(saved) : false;
   }
 
   private saveMuteState() {
-    localStorage.setItem('soundMuted', JSON.stringify(this.isMuted));
+    safeLocalStorage.setItem('soundMuted', JSON.stringify(this.isMuted));
   }
 
   /**

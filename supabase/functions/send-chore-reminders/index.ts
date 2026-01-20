@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 // VAPID public key (matches the one in frontend)
-const VAPID_PUBLIC_KEY = 'BJwH33Ca0A2Wmsupybxpadhc9hriqzi9UGcgQU_1ShK2Mkqsnz-XCW2R1LDcIgXUTB4IH5LwO4LgRMCdiSHrBNk';
+const VAPID_PUBLIC_KEY = 'BCJ8ylekHp0_kee88jzNq5PUWSO9HKC0msfHdpccqvnqU_jKfJSmXDa4dbiekETKmNkVgNdIe7BctLna3tXdLzk';
 
 // Helper function to convert base64url to Uint8Array
 function base64UrlToUint8Array(base64Url: string): Uint8Array {
@@ -275,34 +275,20 @@ serve(async (req) => {
           continue;
         }
 
-        // Parse reminder time (format: HH:MM:SS or HH:MM)
-        const [reminderHour, reminderMinute] = pref.reminder_time.split(':').map(Number);
-        
-        // Check if it's within 15 minutes of reminder time (since cron runs every 15 min)
-        const timeDiff = Math.abs((currentHour * 60 + currentMinute) - (reminderHour * 60 + reminderMinute));
-        if (timeDiff > 15) {
+        if (!pref.reminder_time) {
           skippedCount++;
           continue;
         }
 
-        // Get user's incomplete chores
-        const { data: chores, error: choresError } = await supabase
-          .from('chores')
-          .select('id, title')
-          .eq('user_id', pref.user_id)
-          .eq('completed', false);
-
-        if (choresError) {
-          console.error(`Error fetching chores for user ${pref.user_id}:`, choresError);
-          errorCount++;
+        // Parse reminder time (format: HH:MM:SS or HH:MM)
+        const [reminderHour, reminderMinute] = pref.reminder_time.split(':').map(Number);
+        if (Number.isNaN(reminderHour) || Number.isNaN(reminderMinute)) {
+          skippedCount++;
           continue;
         }
-
-        const choreCount = chores?.length || 0;
         
-        // Only send notification if there are incomplete chores
-        if (choreCount === 0) {
-          console.log(`User ${pref.user_id} has no incomplete chores, skipping`);
+        // Only send at the exact scheduled minute
+        if (currentHour !== reminderHour || currentMinute !== reminderMinute) {
           skippedCount++;
           continue;
         }
@@ -311,7 +297,7 @@ serve(async (req) => {
         if (pref.push_subscription?.endpoint && pref.push_subscription?.keys) {
           const notificationPayload = {
             title: '⏰ Chore Reminder!',
-            body: `You have ${choreCount} incomplete chore${choreCount > 1 ? 's' : ''}. Time to earn those coins! 💰`,
+            body: 'Time to check your chores and earn those coins! 💰',
             icon: '/favicon.ico',
             badge: '/favicon.ico',
             data: {

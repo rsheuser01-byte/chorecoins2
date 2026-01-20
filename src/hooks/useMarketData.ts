@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface Stock {
   symbol: string;
@@ -11,7 +12,7 @@ export interface Stock {
 
 export const useMarketData = () => {
   const [stocks, setStocks] = useState<Stock[]>(() => {
-    const saved = localStorage.getItem('marketStocks');
+    const saved = safeLocalStorage.getItem('marketStocks');
     return saved ? JSON.parse(saved) : [
       { symbol: 'AAPL', name: 'Apple Inc.', price: 175.50, change: 2.3, owned: 0, avgPrice: 0 },
       { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 142.80, change: -1.2, owned: 0, avgPrice: 0 },
@@ -23,16 +24,16 @@ export const useMarketData = () => {
   });
 
   const [marketCash, setMarketCash] = useState(() => {
-    const saved = localStorage.getItem('marketCash');
+    const saved = safeLocalStorage.getItem('marketCash');
     return saved ? parseFloat(saved) : 10000; // Start with $10,000 virtual money
   });
 
   useEffect(() => {
-    localStorage.setItem('marketStocks', JSON.stringify(stocks));
+    safeLocalStorage.setItem('marketStocks', JSON.stringify(stocks));
   }, [stocks]);
 
   useEffect(() => {
-    localStorage.setItem('marketCash', marketCash.toString());
+    safeLocalStorage.setItem('marketCash', marketCash.toString());
   }, [marketCash]);
 
   // Simulate market fluctuations

@@ -12,6 +12,7 @@ import {
   initializeDatabase,
   getDatabase
 } from '@/services/database';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface DatabaseState {
   isConnected: boolean;
@@ -417,7 +418,7 @@ export const useDatabase = () => {
         pendingChanges: status.pendingChanges,
       }));
       
-      localStorage.setItem('lastSync', new Date().toISOString());
+      safeLocalStorage.setItem('lastSync', new Date().toISOString());
     } catch (error) {
       console.error('Failed to sync data:', error);
     }

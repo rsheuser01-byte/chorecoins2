@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface Achievement {
   id: string;
@@ -43,7 +44,7 @@ export const useGamification = () => {
   const { playCoin, playSuccess, playLevelUp, playAchievement } = useSoundEffects();
   
   const [userStats, setUserStats] = useState<UserStats>(() => {
-    const saved = localStorage.getItem('userStats');
+    const saved = safeLocalStorage.getItem('userStats');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -106,7 +107,7 @@ export const useGamification = () => {
   });
 
   const [achievements, setAchievements] = useState<Achievement[]>(() => {
-    const saved = localStorage.getItem('achievements');
+    const saved = safeLocalStorage.getItem('achievements');
     return saved ? JSON.parse(saved) : [
       // 🏠 CHORES ACHIEVEMENTS
       { 
@@ -429,14 +430,14 @@ export const useGamification = () => {
   // Debounced localStorage updates to prevent excessive writes during rapid state changes
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      localStorage.setItem('userStats', JSON.stringify(userStats));
+      safeLocalStorage.setItem('userStats', JSON.stringify(userStats));
     }, 100);
     return () => clearTimeout(timeoutId);
   }, [userStats]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      localStorage.setItem('achievements', JSON.stringify(achievements));
+      safeLocalStorage.setItem('achievements', JSON.stringify(achievements));
     }, 100);
     return () => clearTimeout(timeoutId);
   }, [achievements]);

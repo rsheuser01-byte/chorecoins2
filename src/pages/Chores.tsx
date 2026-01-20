@@ -15,6 +15,7 @@ import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalend
 import { ChoreCompletionAnimation } from '@/components/ChoreCompletionAnimation';
 import { format, isToday } from 'date-fns';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -117,7 +118,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   ];
 
   const [choreData, setChoreData] = useState<Chore[]>(() => {
-    const saved = localStorage.getItem('chores');
+    const saved = safeLocalStorage.getItem('chores');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
@@ -141,7 +142,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     title: ''
   });
   const [weeklyAllowance, setWeeklyAllowance] = useState<number>(() => {
-    const saved = localStorage.getItem('weeklyAllowance');
+    const saved = safeLocalStorage.getItem('weeklyAllowance');
     return saved ? parseInt(saved) : DEFAULT_WEEKLY_ALLOWANCE;
   });
   const [newChore, setNewChore] = useState({
@@ -176,7 +177,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       
       const updatedChores = [...choreData, chore];
       setChoreData(updatedChores);
-      localStorage.setItem('chores', JSON.stringify(updatedChores));
+      safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
       
       setNewChore({
         title: '',
@@ -197,7 +198,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         c.id === editingChore.id ? editingChore : c
     );
     setChoreData(updatedChores);
-    localStorage.setItem('chores', JSON.stringify(updatedChores));
+    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
       setIsEditChoreOpen(false);
       setEditingChore(null);
     }
@@ -210,7 +211,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const saveWeeklyAllowance = (newAmount: number) => {
     setWeeklyAllowance(newAmount);
-    localStorage.setItem('weeklyAllowance', newAmount.toString());
+    safeLocalStorage.setItem('weeklyAllowance', newAmount.toString());
     setIsSettingsOpen(false);
   };
 
@@ -234,7 +235,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const handleChoreUpdate = (updatedChores: BaseChore[]) => {
     setChoreData(updatedChores as Chore[]);
-    localStorage.setItem('chores', JSON.stringify(updatedChores));
+    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
   };
 
   const handleChoreComplete = (chore: Chore) => {
@@ -272,7 +273,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       c.id === choreId ? { ...c, completed: !c.completed } : c
     );
     setChoreData(updatedChores);
-    localStorage.setItem('chores', JSON.stringify(updatedChores));
+    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
     
     // Handle streak logic based on completion status
     if (!chore.completed) {

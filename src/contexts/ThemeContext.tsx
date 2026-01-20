@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 type Theme = 'light' | 'dark';
 
@@ -42,7 +43,7 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(() => {
     // Check localStorage first
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    const savedTheme = safeLocalStorage.getItem('theme') as Theme | null;
     if (savedTheme === 'light' || savedTheme === 'dark') {
       return savedTheme;
     }
@@ -56,7 +57,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   });
 
   const [colors, setColorsState] = useState<CustomColors>(() => {
-    const savedColors = localStorage.getItem('customColors');
+    const savedColors = safeLocalStorage.getItem('customColors');
     if (savedColors) {
       try {
         const parsed = JSON.parse(savedColors);
@@ -84,7 +85,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
     
     // Save to localStorage
-    localStorage.setItem('theme', theme);
+    safeLocalStorage.setItem('theme', theme);
   }, [theme]);
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     root.style.setProperty('--success-green', colors.successGreen);
     
     // Save to localStorage
-    localStorage.setItem('customColors', JSON.stringify(colors));
+    safeLocalStorage.setItem('customColors', JSON.stringify(colors));
   }, [colors]);
 
   const setTheme = (newTheme: Theme) => {

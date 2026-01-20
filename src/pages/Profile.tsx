@@ -21,6 +21,7 @@ import { ColorPicker } from '@/components/ColorPicker';
 import { WeeklySummary } from '@/components/WeeklySummary';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { useSearchParams } from 'react-router-dom';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 const Profile = () => {
   const { user, isAuthenticated } = useAuth();
@@ -53,19 +54,19 @@ const Profile = () => {
   
   // Get chores and weekly allowance for weekly summary
   const chores = React.useMemo(() => {
-    const saved = localStorage.getItem('chores');
+    const saved = safeLocalStorage.getItem('chores');
     return saved ? JSON.parse(saved) : [];
   }, []);
   
   const weeklyAllowance = React.useMemo(() => {
-    const saved = localStorage.getItem('weeklyAllowance');
+    const saved = safeLocalStorage.getItem('weeklyAllowance');
     return saved ? parseInt(saved) : 20;
   }, []);
   
   // Stabilize profileData initialization with useMemo to prevent flicker
   const [profileData, setProfileData] = useState(() => {
     try {
-      const saved = localStorage.getItem('profileData');
+      const saved = safeLocalStorage.getItem('profileData');
       return saved ? JSON.parse(saved) : {
         name: user?.name || 'Nova',
         bio: 'Future Financial Genius',
@@ -166,7 +167,7 @@ const Profile = () => {
 
   const handleSaveProfile = () => {
     setProfileData(tempProfileData);
-    localStorage.setItem('profileData', JSON.stringify(tempProfileData));
+    safeLocalStorage.setItem('profileData', JSON.stringify(tempProfileData));
     setIsEditModalOpen(false);
   };
 
@@ -807,8 +808,8 @@ const Profile = () => {
                         name: 'Nova',
                         email: 'nova@demo.com'
                       };
-                      localStorage.setItem('currentUser', JSON.stringify(demoUser));
-                      localStorage.setItem('sessionToken', btoa('nova' + Date.now()));
+                      safeLocalStorage.setItem('currentUser', JSON.stringify(demoUser));
+                      safeLocalStorage.setItem('sessionToken', btoa('nova' + Date.now()));
                       window.location.reload();
                     }}
                     className="bg-orange-600 hover:bg-orange-700"

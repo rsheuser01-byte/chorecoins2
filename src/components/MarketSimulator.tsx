@@ -22,6 +22,7 @@ import { StockTradingCard } from './StockTradingCard';
 import { IllustratedStatCard } from './IllustratedStatCard';
 import { AnimatedList } from './AnimatedList';
 import { ParticleEffect } from './ParticleEffect';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export const MarketSimulator = () => {
   const { stocks, marketCash, buyStock, sellStock, portfolioValue, totalPortfolioValue, portfolioChange } = useMarketData();
@@ -41,7 +42,7 @@ export const MarketSimulator = () => {
   const [tradeType, setTradeType] = useState<'buy' | 'sell'>('buy');
   // Check localStorage to see if tutorial was already dismissed
   const [showTutorial, setShowTutorial] = useState(() => {
-    const dismissed = localStorage.getItem('marketSimulatorTutorialDismissed');
+    const dismissed = safeLocalStorage.getItem('marketSimulatorTutorialDismissed');
     return dismissed !== 'true';
   });
   const [bitcoinInvested, setBitcoinInvested] = useState(false);
@@ -83,7 +84,7 @@ export const MarketSimulator = () => {
   const handleTutorialClose = () => {
     setShowTutorial(false);
     // Persist the dismissal in localStorage so it doesn't show again
-    localStorage.setItem('marketSimulatorTutorialDismissed', 'true');
+    safeLocalStorage.setItem('marketSimulatorTutorialDismissed', 'true');
   };
 
   // Use stocks based on selected mode, fallback to simulator stocks if needed

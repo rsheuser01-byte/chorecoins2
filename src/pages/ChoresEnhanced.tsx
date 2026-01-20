@@ -13,6 +13,7 @@ import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, T
 import { useGamification } from '@/hooks/useGamification';
 import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalendar';
 import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -96,7 +97,7 @@ export default function ChoresEnhanced() {
 
   // State management
   const [chores, setChores] = useState<Chore[]>(() => {
-    const saved = localStorage.getItem('chores');
+    const saved = safeLocalStorage.getItem('chores');
     return saved ? JSON.parse(saved).map((chore: any) => ({
       ...chore,
       dueDate: new Date(chore.dueDate)
@@ -124,12 +125,12 @@ export default function ChoresEnhanced() {
 
   // Save chores to localStorage
   useEffect(() => {
-    localStorage.setItem('chores', JSON.stringify(chores));
+    safeLocalStorage.setItem('chores', JSON.stringify(chores));
   }, [chores]);
 
   // Load weekly allowance from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('weeklyAllowance');
+    const saved = safeLocalStorage.getItem('weeklyAllowance');
     if (saved) {
       setWeeklyAllowance(parseInt(saved));
     }
@@ -137,7 +138,7 @@ export default function ChoresEnhanced() {
 
   const saveWeeklyAllowance = (amount: number) => {
     setWeeklyAllowance(amount);
-    localStorage.setItem('weeklyAllowance', amount.toString());
+    safeLocalStorage.setItem('weeklyAllowance', amount.toString());
     setIsSettingsOpen(false);
   };
 

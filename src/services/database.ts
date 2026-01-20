@@ -1,5 +1,6 @@
 // Database service for Neon PostgreSQL integration
 // This service handles all database operations for the app
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface DatabaseConfig {
   connectionString: string;
@@ -423,20 +424,20 @@ export class DatabaseService {
   }
 
   private getPendingChanges(): any[] {
-    const pending = localStorage.getItem('pendingChanges');
+    const pending = safeLocalStorage.getItem('pendingChanges');
     return pending ? JSON.parse(pending) : [];
   }
 
   private addPendingChange(change: any): void {
     const pending = this.getPendingChanges();
     pending.push({ ...change, id: Date.now().toString() });
-    localStorage.setItem('pendingChanges', JSON.stringify(pending));
+    safeLocalStorage.setItem('pendingChanges', JSON.stringify(pending));
   }
 
   private removePendingChange(changeId: string): void {
     const pending = this.getPendingChanges();
     const filtered = pending.filter((change: any) => change.id !== changeId);
-    localStorage.setItem('pendingChanges', JSON.stringify(filtered));
+    safeLocalStorage.setItem('pendingChanges', JSON.stringify(filtered));
   }
 
   // Utility methods
@@ -452,7 +453,7 @@ export class DatabaseService {
   async getDatabaseStatus(): Promise<{ connected: boolean; lastSync: string; pendingChanges: number }> {
     const connected = await this.isConnected();
     const pendingChanges = this.getPendingChanges().length;
-    const lastSync = localStorage.getItem('lastSync') || 'Never';
+    const lastSync = safeLocalStorage.getItem('lastSync') || 'Never';
     
     return { connected, lastSync, pendingChanges };
   }

@@ -16,6 +16,7 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useDatabase } from '@/hooks/useDatabase';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export const DatabaseConfig = () => {
   const { initialize, isConnected, error } = useDatabase();
@@ -26,7 +27,7 @@ export const DatabaseConfig = () => {
 
   // Load saved connection string
   React.useEffect(() => {
-    const saved = localStorage.getItem('dbConfig');
+    const saved = safeLocalStorage.getItem('dbConfig');
     if (saved) {
       const config = JSON.parse(saved);
       setConnectionString(config.connectionString || '');

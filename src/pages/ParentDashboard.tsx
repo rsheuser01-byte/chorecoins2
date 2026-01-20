@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
 import { format, startOfWeek, endOfWeek, isToday, subDays, eachDayOfInterval } from 'date-fns';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export const ParentDashboard = () => {
   const { userStats } = useGamification();
@@ -19,7 +20,7 @@ export const ParentDashboard = () => {
   // Get chores from localStorage (in real app, from API)
   const chores = useMemo(() => {
     try {
-      const saved = localStorage.getItem('chores');
+      const saved = safeLocalStorage.getItem('chores');
       return saved ? JSON.parse(saved) : [];
     } catch (error) {
       console.error('Error parsing chores from localStorage:', error);

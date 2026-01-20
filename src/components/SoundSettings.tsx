@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Volume2, VolumeX, Music } from 'lucide-react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { useBackgroundMusic } from '@/hooks/useBackgroundMusic';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export const SoundSettings: React.FC = () => {
   const { 
@@ -25,9 +26,9 @@ export const SoundSettings: React.FC = () => {
 
   // Load saved preferences
   useEffect(() => {
-    const savedMaster = localStorage.getItem('masterVolume');
-    const savedSFX = localStorage.getItem('sfxVolume');
-    const savedMusic = localStorage.getItem('musicEnabled');
+    const savedMaster = safeLocalStorage.getItem('masterVolume');
+    const savedSFX = safeLocalStorage.getItem('sfxVolume');
+    const savedMusic = safeLocalStorage.getItem('musicEnabled');
 
     if (savedMaster) {
       const volume = parseInt(savedMaster);
@@ -50,7 +51,7 @@ export const SoundSettings: React.FC = () => {
     const volume = value[0];
     setMasterVolumeState(volume);
     setMasterVolume(volume / 100);
-    localStorage.setItem('masterVolume', volume.toString());
+    safeLocalStorage.setItem('masterVolume', volume.toString());
     playClick();
   };
 
@@ -58,13 +59,13 @@ export const SoundSettings: React.FC = () => {
     const volume = value[0];
     setSFXVolumeState(volume);
     setSFXVolume(volume / 100);
-    localStorage.setItem('sfxVolume', volume.toString());
+    safeLocalStorage.setItem('sfxVolume', volume.toString());
     playClick();
   };
 
   const handleMusicToggle = (enabled: boolean) => {
     setMusicEnabled(enabled);
-    localStorage.setItem('musicEnabled', JSON.stringify(enabled));
+    safeLocalStorage.setItem('musicEnabled', JSON.stringify(enabled));
     
     if (enabled) {
       enableMusic();

@@ -9,6 +9,7 @@ import {
   getCoinbaseAPI,
   POPULAR_PAIRS
 } from '@/services/coinbaseApi';
+import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
 export interface CoinbaseCredentials {
   apiKey: string;
@@ -40,7 +41,7 @@ export const useCoinbase = () => {
 
   const [credentials, setCredentials] = useState<CoinbaseCredentials | null>(() => {
     try {
-      const saved = localStorage.getItem('coinbaseCredentials');
+      const saved = safeLocalStorage.getItem('coinbaseCredentials');
       return saved ? JSON.parse(saved) : null;
     } catch (error) {
       console.error('Error parsing Coinbase credentials from localStorage:', error);
@@ -64,7 +65,7 @@ export const useCoinbase = () => {
       const accounts = await api.getAccounts();
       
       setCredentials(creds);
-      localStorage.setItem('coinbaseCredentials', JSON.stringify(creds));
+      safeLocalStorage.setItem('coinbaseCredentials', JSON.stringify(creds));
       
       setState(prev => ({
         ...prev,
@@ -88,7 +89,7 @@ export const useCoinbase = () => {
   // Disconnect from Coinbase
   const disconnect = useCallback(() => {
     setCredentials(null);
-    localStorage.removeItem('coinbaseCredentials');
+    safeLocalStorage.removeItem('coinbaseCredentials');
     setState({
       isConnected: false,
       isLoading: false,
