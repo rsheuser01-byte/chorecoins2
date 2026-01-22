@@ -123,19 +123,22 @@ All colors MUST be HSL.
 
   html {
     overflow-x: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     /* Allow natural scrolling on mobile */
     position: relative;
     height: 100%;
+    touch-action: auto;
   }
   
   body {
     @apply bg-background text-foreground;
     overflow-x: hidden;
+    overflow-y: auto;
     /* Let body scroll naturally - don't force overflow-y */
     -webkit-overflow-scrolling: touch;
     /* Allow pan-y for vertical scrolling, pan-x for horizontal when needed */
-    touch-action: pan-y pan-x;
+    touch-action: auto;
     -webkit-tap-highlight-color: transparent;
     position: relative;
     min-height: 100%;
@@ -146,7 +149,7 @@ All colors MUST be HSL.
   }
   
   button, a, [role="button"], [role="tab"] {
-    touch-action: pan-y manipulation;
+    touch-action: auto;
     -webkit-tap-highlight-color: transparent;
     cursor: pointer;
   }
