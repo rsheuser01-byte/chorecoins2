@@ -78,7 +78,6 @@ const Invest = () => {
       setCurrentMessage((prev) => (prev + 1) % (mascotMessages?.length || 3));
     }, 15000);
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isLoading) {

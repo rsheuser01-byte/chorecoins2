@@ -1,4 +1,13 @@
-import crypto from 'crypto';
+const textEncoder = new TextEncoder();
+
+const base64ToBytes = (base64: string) => {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+};
 
 // Types for Coinbase API
 export interface CoinbaseAccount {
@@ -94,18 +103,30 @@ export class CoinbaseAPI {
   }
 
   // Generate authentication signature
-  private generateSignature(
+  private async generateSignature(
     timestamp: string,
     method: string,
     path: string,
     body: string = ''
-  ): string {
+  ): Promise<string> {
     const message = timestamp + method + path + body;
-    const secret = Buffer.from(this.apiSecret, 'base64');
-    return crypto
-      .createHmac('sha256', secret)
-      .update(message)
-      .digest('base64');
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle) {
+      throw new Error('Web Crypto API is not available in this environment.');
+    }
+
+    const key = await subtle.importKey(
+      'raw',
+      base64ToBytes(this.apiSecret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signature = await subtle.sign('HMAC', key, textEncoder.encode(message));
+    const signatureBytes = new Uint8Array(signature);
+    const base64 = btoa(String.fromCharCode(...signatureBytes));
+    return base64;
   }
 
   // Make authenticated request
@@ -116,7 +137,7 @@ export class CoinbaseAPI {
   ): Promise<any> {
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const bodyString = body ? JSON.stringify(body) : '';
-    const signature = this.generateSignature(timestamp, method, path, bodyString);
+    const signature = await this.generateSignature(timestamp, method, path, bodyString);
 
     const headers = {
       'CB-ACCESS-KEY': this.apiKey,

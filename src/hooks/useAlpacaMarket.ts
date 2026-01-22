@@ -229,7 +229,6 @@ export const useAlpacaMarket = (enableAutoRefresh = false, refreshInterval = 100
     if (isConnected) {
       loadPositions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
   // Auto-refresh quotes at specified interval
@@ -244,7 +243,6 @@ export const useAlpacaMarket = (enableAutoRefresh = false, refreshInterval = 100
     refreshQuotes();
 
     return () => clearInterval(interval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enableAutoRefresh, isConnected, refreshInterval]);
 
   return {

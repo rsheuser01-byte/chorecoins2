@@ -280,13 +280,6 @@ All colors MUST be HSL.
       -webkit-overflow-scrolling: touch;
     }
     
-    /* Ensure fixed elements don't interfere with scrolling */
-    /* But allow modals, dialogs, and high z-index overlays to be interactive */
-    [class*="fixed"]:not([role="dialog"]):not([data-modal]):not([data-dialog]) {
-      touch-action: none;
-      pointer-events: none;
-    }
-    
     /* Explicitly allow modals and dialogs to be interactive */
     [role="dialog"],
     [data-modal],

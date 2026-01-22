@@ -3,6 +3,8 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
+process.env.BROWSERSLIST_IGNORE_OLD_DATA = "true";
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
@@ -21,4 +23,7 @@ export default defineConfig(({ mode }) => ({
   },
   // Environment variables that should be exposed to the client
   envPrefix: ['VITE_', 'NODE_ENV'],
+  build: {
+    chunkSizeWarningLimit: 2000,
+  },
 }));

@@ -93,10 +93,11 @@ export const DepositScheduleDialog: React.FC<DepositScheduleDialogProps> = ({
     const nextDate = new Date(today);
 
     switch (frequency) {
-      case 'weekly':
+      case 'weekly': {
         const daysUntilNext = (dayOfWeek - today.getDay() + 7) % 7;
         nextDate.setDate(today.getDate() + (daysUntilNext === 0 ? 7 : daysUntilNext));
         break;
+      }
       case 'biweekly':
         nextDate.setDate(today.getDate() + 14);
         break;

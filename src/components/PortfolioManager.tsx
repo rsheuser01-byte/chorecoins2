@@ -51,7 +51,6 @@ export const PortfolioManager = () => {
     if (isConnected) {
       alpaca.loadPositions();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isConnected]);
 
   const handleAddItem = () => {
