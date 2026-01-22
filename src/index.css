@@ -147,6 +147,18 @@ All colors MUST be HSL.
   #root {
     min-height: 100%;
   }
+
+  @supports (min-height: 100svh) {
+    .min-h-screen {
+      min-height: 100svh;
+    }
+  }
+
+  @supports (min-height: 100dvh) {
+    .min-h-screen {
+      min-height: 100dvh;
+    }
+  }
   
   button, a, [role="button"], [role="tab"] {
     touch-action: auto;
