@@ -47,6 +47,19 @@ const RouteChangeHandler = () => {
   const location = useLocation();
 
   useEffect(() => {
+    const resetScrollLock = () => {
+      const { body, documentElement } = document;
+      body.style.overflow = '';
+      body.style.position = '';
+      body.style.top = '';
+      body.style.left = '';
+      body.style.right = '';
+      body.style.width = '';
+      body.style.touchAction = '';
+      documentElement.style.overflow = '';
+      documentElement.style.position = '';
+    };
+
     // Stop any playing audio elements when route changes
     const audioElements = document.querySelectorAll('audio, video');
     audioElements.forEach((element) => {
@@ -59,6 +72,8 @@ const RouteChangeHandler = () => {
 
     // Prevent any Web Audio API contexts from playing sounds
     // This ensures no sounds are triggered by route changes
+
+    resetScrollLock();
   }, [location.pathname]);
 
   // Global effect to prevent sounds on initial load and navigation
