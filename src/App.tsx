@@ -104,8 +104,52 @@ const RouteChangeHandler = () => {
   return null;
 };
 
+const ScrollLockGuard = () => {
+  useEffect(() => {
+    const unlockScroll = () => {
+      const hasOpenDialog = !!document.querySelector(
+        '[role="dialog"][data-state="open"], [data-dialog][data-state="open"], [data-modal="true"][data-state="open"]'
+      );
+
+      if (!hasOpenDialog) {
+        const { body, documentElement } = document;
+        body.style.overflow = '';
+        body.style.position = '';
+        body.style.top = '';
+        body.style.left = '';
+        body.style.right = '';
+        body.style.width = '';
+        body.style.touchAction = '';
+        documentElement.style.overflow = '';
+        documentElement.style.position = '';
+      }
+    };
+
+    unlockScroll();
+
+    const observer = new MutationObserver(unlockScroll);
+    observer.observe(document.body, {
+      attributes: true,
+      childList: true,
+      subtree: true,
+    });
+
+    window.addEventListener('focus', unlockScroll);
+    window.addEventListener('pageshow', unlockScroll);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('focus', unlockScroll);
+      window.removeEventListener('pageshow', unlockScroll);
+    };
+  }, []);
+
+  return null;
+};
+
 const AppContent = () => (
   <div className="min-h-screen bg-background overflow-x-hidden" style={{ touchAction: 'pan-y' }}>
+    <ScrollLockGuard />
     <AuthHashRedirect />
     <RouteChangeHandler />
     <Header />

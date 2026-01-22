@@ -140,6 +140,10 @@ All colors MUST be HSL.
     position: relative;
     min-height: 100%;
   }
+
+  #root {
+    min-height: 100%;
+  }
   
   button, a, [role="button"], [role="tab"] {
     touch-action: pan-y manipulation;
