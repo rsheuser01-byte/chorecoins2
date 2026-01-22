@@ -148,7 +148,10 @@ const ScrollLockGuard = () => {
 };
 
 const AppContent = () => (
-  <div className="min-h-screen bg-background overflow-x-hidden">
+  <div
+    className="min-h-screen bg-background overflow-x-hidden overflow-y-auto"
+    style={{ WebkitOverflowScrolling: 'touch' }}
+  >
     <ScrollLockGuard />
     <AuthHashRedirect />
     <RouteChangeHandler />
