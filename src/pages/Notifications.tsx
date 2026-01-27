@@ -181,7 +181,7 @@ export default function Notifications() {
               {!isSupported && (
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    Push notifications are not supported in your browser. Try using Chrome, Firefox, or Edge.
+                    Push notifications require a supported browser. On iPad/iPhone, use Safari and add the app to your Home Screen. On Android, use Chrome.
                   </p>
                 </div>
               )}
