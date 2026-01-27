@@ -60,7 +60,8 @@ export interface Chore {
   reward: number;
   completed: boolean;
   due_date: string;
-  recurring: 'none' | 'daily' | 'weekly' | 'monthly';
+  recurring: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
+  recurring_days?: number[];
   priority: 'low' | 'medium' | 'high';
   category: string;
   emoji?: string;

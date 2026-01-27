@@ -21,6 +21,7 @@ import { safeLocalStorage } from '@/lib/safeLocalStorage';
 interface Chore extends Omit<BaseChore, 'reward'> {
   difficulty?: 'easy' | 'medium' | 'hard';
   emoji?: string;
+  recurringDays?: number[];
 }
 
 // Default weekly allowance - can be adjusted in settings
@@ -94,20 +95,36 @@ const choreCategories = {
   }
 };
 
+const weekDays = [
+  { value: 0, label: 'Sun' },
+  { value: 1, label: 'Mon' },
+  { value: 2, label: 'Tue' },
+  { value: 3, label: 'Wed' },
+  { value: 4, label: 'Thu' },
+  { value: 5, label: 'Fri' },
+  { value: 6, label: 'Sat' },
+];
+
 export default function Chores() {
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // Convert old format chores to new format
 const convertToNewFormat = (oldChores: any[]): Chore[] => {
-  return oldChores.map(chore => ({
+  return oldChores.map(chore => {
+    const recurring = chore.recurring || 'none';
+    const recurringDays = Array.isArray(chore.recurringDays) ? chore.recurringDays : [];
+    return ({
       ...chore,
       difficulty: chore.difficulty || 'medium',
       emoji: chore.emoji || '✅',
       description: chore.description || '',
       dueDate: chore.dueDate ? new Date(chore.dueDate) : (chore.date ? new Date(chore.date) : new Date()),
       priority: chore.priority || 'medium',
-      category: chore.category || '🏠 Home'
-  }));
+      category: chore.category || '🏠 Home',
+      recurring,
+      recurringDays: recurring === 'custom' ? (recurringDays.length ? recurringDays : [new Date().getDay()]) : recurringDays
+  });
+  });
 };
 
   // Mock chores data - replace with your actual data source
@@ -145,13 +162,19 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     const saved = safeLocalStorage.getItem('weeklyAllowance');
     return saved ? parseInt(saved) : DEFAULT_WEEKLY_ALLOWANCE;
   });
+  const toggleRecurringDay = (days: number[], dayValue: number) => {
+    return days.includes(dayValue)
+      ? days.filter(day => day !== dayValue)
+      : [...days, dayValue].sort();
+  };
   const [newChore, setNewChore] = useState({
     title: '',
     description: '',
     category: '🏠 Home',
     difficulty: 'easy' as 'easy' | 'medium' | 'hard',
     emoji: '✅',
-    recurring: 'none' as 'none' | 'daily' | 'weekly' | 'monthly'
+    recurring: 'none' as 'none' | 'daily' | 'weekly' | 'monthly' | 'custom',
+    recurringDays: [new Date().getDay()]
   });
 
   const [celebration, setCelebration] = useState({
@@ -169,6 +192,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         completed: false,
         dueDate: selectedDateForAdd ? selectedDateForAdd : new Date(),
         recurring: newChore.recurring,
+        recurringDays: newChore.recurring === 'custom' ? newChore.recurringDays : undefined,
         difficulty: newChore.difficulty,
         emoji: newChore.emoji,
         priority: 'medium',
@@ -185,7 +209,8 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         category: '🏠 Home',
         difficulty: 'easy' as 'easy' | 'medium' | 'hard',
         emoji: '✅',
-        recurring: 'none'
+        recurring: 'none',
+        recurringDays: [new Date().getDay()]
       });
       setSelectedDateForAdd(null);
       setIsAddChoreOpen(false);
@@ -524,7 +549,16 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                         <div className="grid grid-cols-2 gap-3">
                           <div className="space-y-2">
                             <Label htmlFor="recurring">Repeat</Label>
-                            <Select value={newChore.recurring} onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly') => setNewChore({ ...newChore, recurring: value })}>
+                          <Select
+                            value={newChore.recurring}
+                            onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') =>
+                              setNewChore(prev => ({
+                                ...prev,
+                                recurring: value,
+                                recurringDays: value === 'custom' ? (prev.recurringDays.length ? prev.recurringDays : [new Date().getDay()]) : prev.recurringDays
+                              }))
+                            }
+                          >
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
@@ -533,9 +567,37 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                 <SelectItem value="daily">Daily</SelectItem>
                                 <SelectItem value="weekly">Weekly</SelectItem>
                                 <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="custom">Custom days</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
+
+                        {newChore.recurring === 'custom' && (
+                          <div className="space-y-2">
+                            <Label>Repeat On</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {weekDays.map((day) => (
+                                <Button
+                                  key={day.value}
+                                  type="button"
+                                  size="sm"
+                                  variant={newChore.recurringDays.includes(day.value) ? 'default' : 'outline'}
+                                  onClick={() =>
+                                    setNewChore(prev => ({
+                                      ...prev,
+                                      recurringDays: toggleRecurringDay(prev.recurringDays, day.value)
+                                    }))
+                                  }
+                                >
+                                  {day.label}
+                                </Button>
+                              ))}
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              Pick one or more days for this chore.
+                            </p>
+                          </div>
+                        )}
                         </div>
                         
                         <div className="flex gap-3 pt-4">
@@ -674,10 +736,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label htmlFor="edit-recurring">Repeat</Label>
-                              <Select 
+                          <Select 
                                 value={editingChore.recurring || 'none'} 
-                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly') => 
-                                  setEditingChore({ ...editingChore, recurring: value })
+                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') => 
+                                  setEditingChore(prev => prev ? ({
+                                    ...prev,
+                                    recurring: value,
+                                    recurringDays: value === 'custom' ? (prev.recurringDays?.length ? prev.recurringDays : [new Date().getDay()]) : prev.recurringDays
+                                  }) : prev)
                                 }
                               >
                                 <SelectTrigger>
@@ -688,9 +754,37 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                   <SelectItem value="daily">Daily</SelectItem>
                                   <SelectItem value="weekly">Weekly</SelectItem>
                                   <SelectItem value="monthly">Monthly</SelectItem>
+                                  <SelectItem value="custom">Custom days</SelectItem>
                                 </SelectContent>
                               </Select>
                             </div>
+
+                          {editingChore?.recurring === 'custom' && (
+                            <div className="space-y-2">
+                              <Label>Repeat On</Label>
+                              <div className="flex flex-wrap gap-2">
+                                {weekDays.map((day) => (
+                                  <Button
+                                    key={day.value}
+                                    type="button"
+                                    size="sm"
+                                    variant={editingChore.recurringDays?.includes(day.value) ? 'default' : 'outline'}
+                                    onClick={() =>
+                                      setEditingChore(prev => prev ? ({
+                                        ...prev,
+                                        recurringDays: toggleRecurringDay(prev.recurringDays || [], day.value)
+                                      }) : prev)
+                                    }
+                                  >
+                                    {day.label}
+                                  </Button>
+                                ))}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                Pick one or more days for this chore.
+                              </p>
+                            </div>
+                          )}
                           </div>
                           
                           <div className="flex gap-3 pt-4">
