@@ -254,6 +254,24 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
     }
   };
 
+  const getDifficultyColor = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return 'bg-green-100 text-green-800 border-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'hard': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getDifficultyIcon = (difficulty: string) => {
+    switch (difficulty) {
+      case 'easy': return '🟢';
+      case 'medium': return '🟡';
+      case 'hard': return '🔴';
+      default: return '⚪';
+    }
+  };
+
   const selectedDayChores = getChoresForDate(selectedDate);
 
   return (
@@ -372,8 +390,8 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                                 <p className="text-sm text-muted-foreground mt-1">{chore.description}</p>
                               )}
                               <div className="flex items-center gap-2 mt-2">
-                                <Badge variant="outline" className={getPriorityColor(chore.priority)}>
-                                  {chore.priority}
+                                <Badge variant="outline" className={getDifficultyColor(chore.difficulty ?? 'medium')}>
+                                  {getDifficultyIcon(chore.difficulty ?? 'medium')} {chore.difficulty ?? 'medium'}
                                 </Badge>
                                 <Badge variant="outline">{chore.category}</Badge>
                                 {chore.recurring !== 'none' && (
