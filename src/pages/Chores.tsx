@@ -105,6 +105,18 @@ const weekDays = [
   { value: 6, label: 'Sat' },
 ];
 
+// Emoji options for chore picker (chore-friendly set)
+const CHORE_EMOJIS = [
+  '✅', '🛏️', '🧹', '🏠', '👗', '🪶', '🍽️', '🧽', '🥄', '🔥', '🥫',
+  '🧺', '👕', '🚪', '🧦', '🗑️', '🌱', '🚗', '🍂', '📚', '✏️', '📖',
+  '🎵', '🛒', '🐕', '🤝', '🎲', '⭐', '🌟', '💪', '🎯', '🏆', '💡',
+  '🧼', '🪣', '📦', '🗂️', '🥤', '🍎', '🥕', '🐾', '🌿', '🪴',
+];
+
+const CUSTOM_CHORE_TEMPLATES_KEY = 'customChoreTemplates';
+
+type ChoreTemplate = { title: string; description: string; difficulty: 'easy' | 'medium' | 'hard'; emoji: string };
+
 export default function Chores() {
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
@@ -195,11 +207,38 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     recurringDays: [new Date().getDay()]
   });
 
-  const [celebration, setCelebration] = useState({
-    show: false,
-    message: '',
-    chore: ''
+  // Custom chore templates (saved when user adds a custom chore) – per category
+  const [customChoreTemplates, setCustomChoreTemplates] = useState<Record<string, ChoreTemplate[]>>(() => {
+    try {
+      const saved = safeLocalStorage.getItem(CUSTOM_CHORE_TEMPLATES_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, ChoreTemplate[]>;
+        return typeof parsed === 'object' && parsed !== null ? parsed : {};
+      }
+    } catch (_) {}
+    return {};
   });
+
+  const saveCustomChoreTemplates = (next: Record<string, ChoreTemplate[]>) => {
+    setCustomChoreTemplates(next);
+    safeLocalStorage.setItem(CUSTOM_CHORE_TEMPLATES_KEY, JSON.stringify(next));
+  };
+
+  // All chore options for a category: predefined first, then saved custom (no duplicate titles)
+  const getChoresForCategory = (category: string): ChoreTemplate[] => {
+    const predefined = choreCategories[category as keyof typeof choreCategories]?.chores ?? [];
+    const custom = customChoreTemplates[category] ?? [];
+    const predefinedTitles = new Set(predefined.map((c) => c.title.trim().toLowerCase()));
+    const customOnly = custom.filter((c) => !predefinedTitles.has(c.title.trim().toLowerCase()));
+    const byTitle = new Map<string, ChoreTemplate>();
+    [...predefined, ...customOnly].forEach((c) => byTitle.set(c.title.trim().toLowerCase(), c));
+    return Array.from(byTitle.values());
+  };
+
+  const isPredefinedChore = (category: string, title: string): boolean => {
+    const list = choreCategories[category as keyof typeof choreCategories]?.chores ?? [];
+    return list.some((c) => c.title.trim().toLowerCase() === title.trim().toLowerCase());
+  };
 
   const addChore = () => {
     if (newChore.title.trim()) {
@@ -235,7 +274,23 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       const updatedChores = [...choreData, chore];
       setChoreData(updatedChores);
       safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
-      
+
+      // Save as custom template if not a predefined chore for this category
+      if (!isPredefinedChore(newChore.category, newChore.title.trim())) {
+        const template: ChoreTemplate = {
+          title: newChore.title.trim(),
+          description: newChore.description?.trim() ?? '',
+          difficulty: newChore.difficulty,
+          emoji: newChore.emoji || '✅',
+        };
+        const categoryTemplates = customChoreTemplates[newChore.category] ?? [];
+        const rest = categoryTemplates.filter(
+          (t) => t.title.trim().toLowerCase() !== template.title.toLowerCase()
+        );
+        const next = { ...customChoreTemplates, [newChore.category]: [...rest, template] };
+        saveCustomChoreTemplates(next);
+      }
+
       setNewChore({
         title: '',
         description: '',
@@ -252,10 +307,17 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const editChore = () => {
     if (editingChore) {
-      // Ensure all fields are properly set, especially dueDate which needs to be a Date object
+      // Ensure all fields are properly set; dueDate must be a Date object
       const updatedChore: Chore = {
         ...editingChore,
         dueDate: editingChore.dueDate instanceof Date ? editingChore.dueDate : new Date(editingChore.dueDate),
+        difficulty: editingChore.difficulty ?? 'medium',
+        title: editingChore.title?.trim() ?? editingChore.title,
+        description: editingChore.description ?? '',
+        emoji: editingChore.emoji ?? '✅',
+        category: editingChore.category ?? '🏠 Home',
+        recurring: editingChore.recurring ?? 'none',
+        recurringDays: editingChore.recurring === 'custom' ? (editingChore.recurringDays ?? [new Date().getDay()]) : editingChore.recurringDays,
       };
       
       const updatedChores = choreData.map(c => 
@@ -318,27 +380,6 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     try {
       // Award chore completion (handles XP and achievements internally)
       completeChore(0);
-      
-      // Check if all TODAY's chores are now completed to award weekly allowance
-      // Use a function to get the latest state (after toggleChore has updated it)
-      setChoreData(currentChores => {
-        const todayChores = currentChores.filter(c => isToday(c.dueDate));
-        const allTodayCompleted = todayChores.length > 0 && todayChores.every(c => c.completed);
-        
-        if (allTodayCompleted) {
-          // Show celebration for earning allowance
-          setCelebration({
-            show: true,
-            message: `Amazing! You completed all chores and earned your $${weeklyAllowance} weekly allowance!`,
-            chore: 'Weekly Allowance'
-          });
-          
-          setTimeout(() => setCelebration({ show: false, message: '', chore: '' }), 3000);
-        }
-        
-        // Don't modify the state here - toggleChore already did that
-        return currentChores;
-      });
     } catch (error) {
       console.error('Error completing chore:', error);
     }
@@ -386,23 +427,6 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       </div>
       
       <div className="relative z-10">
-        {/* Celebration Overlay */}
-        {celebration.show && (
-          <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-900 rounded-2xl p-8 shadow-2xl animate-bounce">
-              <div className="text-center">
-                <div className="text-6xl mb-4">🎉</div>
-                <h2 className="text-2xl font-bold text-green-600 mb-2">Congratulations!</h2>
-                <p className="text-lg">{celebration.message}</p>
-                <div className="mt-4 flex justify-center gap-2">
-                  <Badge className="bg-money-green text-white">+${weeklyAllowance} Weekly Allowance</Badge>
-                  <Badge className="bg-money-gold text-white">+20 XP</Badge>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
       <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-7xl">
         <div className="space-y-4 sm:space-y-6">
             {/* Animated Mascot */}
@@ -527,14 +551,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                           </Select>
                         </div>
 
-                        {/* Popular Chores for Selected Category */}
-                        {newChore.category && choreCategories[newChore.category as keyof typeof choreCategories] && (
+                        {/* Popular + saved custom chores for selected category */}
+                        {newChore.category && (
                           <div className="space-y-2">
-                            <Label>Popular {newChore.category} Chores</Label>
+                            <Label>Popular &amp; saved {newChore.category} Chores</Label>
                             <div className="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto p-2 border rounded-lg bg-muted/20">
-                              {choreCategories[newChore.category as keyof typeof choreCategories].chores.map((chore, index) => (
+                              {getChoresForCategory(newChore.category).map((chore, index) => (
                                 <Button
-                                  key={index}
+                                  key={`${chore.title}-${index}`}
                                   variant="ghost"
                                   size="sm"
                                   className="justify-start h-auto p-2 text-left hover:bg-money-green/10"
@@ -542,7 +566,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                     ...newChore,
                                     title: chore.title,
                                     description: chore.description,
-                                    difficulty: chore.difficulty as 'easy' | 'medium' | 'hard',
+                                    difficulty: chore.difficulty,
                                     emoji: chore.emoji
                                   })}
                                 >
@@ -550,7 +574,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                     <span className="text-lg">{chore.emoji}</span>
                                     <div className="flex-1 min-w-0">
                                       <div className="font-medium text-sm">{chore.title}</div>
-                                      <div className="text-xs text-muted-foreground truncate">{chore.description}</div>
+                                      <div className="text-xs text-muted-foreground truncate">{chore.description || '—'}</div>
                                     </div>
                                     <Badge variant="outline" className={`text-xs ${
                                       chore.difficulty === 'easy' ? 'bg-green-100 text-green-800' :
@@ -563,7 +587,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                 </Button>
                               ))}
                             </div>
-                            <p className="text-xs text-muted-foreground">Click a chore above to auto-fill, or create your own below</p>
+                            <p className="text-xs text-muted-foreground">Click a chore to auto-fill, or create your own below (custom chores are saved here)</p>
                           </div>
                         )}
                         
@@ -606,14 +630,21 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                           
                           <div className="space-y-2">
                             <Label htmlFor="emoji">Emoji</Label>
-                            <Input
-                              id="emoji"
-                              value={newChore.emoji}
-                              onChange={(e) => setNewChore({ ...newChore, emoji: e.target.value })}
-                              placeholder="🧹"
-                              className="text-center"
-                              maxLength={2}
-                            />
+                            <Select
+                              value={CHORE_EMOJIS.includes(newChore.emoji) ? newChore.emoji : '✅'}
+                              onValueChange={(value) => setNewChore({ ...newChore, emoji: value })}
+                            >
+                              <SelectTrigger id="emoji" className="text-lg">
+                                <SelectValue placeholder="Pick an emoji" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CHORE_EMOJIS.map((emoji) => (
+                                  <SelectItem key={emoji} value={emoji} className="text-lg">
+                                    {emoji}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                         </div>
 
@@ -805,15 +836,13 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                             <div className="space-y-2">
                               <Label htmlFor="edit-difficulty">Difficulty</Label>
                               <Select 
-                                value={editingChore.difficulty || 'medium'} 
+                                value={editingChore.difficulty ?? 'medium'} 
                                 onValueChange={(value: 'easy' | 'medium' | 'hard') => {
-                                  if (editingChore) {
-                                    setEditingChore({ ...editingChore, difficulty: value });
-                                  }
+                                  setEditingChore(prev => prev ? { ...prev, difficulty: value } : null);
                                 }}
                               >
                                 <SelectTrigger>
-                                  <SelectValue />
+                                  <SelectValue placeholder="Select difficulty" />
                                 </SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="easy">🟢 Easy</SelectItem>
@@ -825,18 +854,23 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                             
                           <div className="space-y-2">
                             <Label htmlFor="edit-emoji">Emoji</Label>
-                            <Input
-                              id="edit-emoji"
-                              value={editingChore.emoji || ''}
-                              onChange={(e) => {
-                                if (editingChore) {
-                                  setEditingChore({ ...editingChore, emoji: e.target.value });
-                                }
+                            <Select
+                              value={editingChore.emoji && CHORE_EMOJIS.includes(editingChore.emoji) ? editingChore.emoji : '✅'}
+                              onValueChange={(value) => {
+                                setEditingChore(prev => prev ? { ...prev, emoji: value } : null);
                               }}
-                              placeholder="🧹"
-                              className="text-center"
-                              maxLength={2}
-                            />
+                            >
+                              <SelectTrigger id="edit-emoji" className="text-lg">
+                                <SelectValue placeholder="Pick an emoji" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {CHORE_EMOJIS.map((emoji) => (
+                                  <SelectItem key={emoji} value={emoji} className="text-lg">
+                                    {emoji}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           </div>
 
@@ -1118,7 +1152,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                 <div className="grid gap-4 sm:gap-6">
                   {Object.entries(choreCategories).map(([categoryName, categoryData]) => {
                     const IconComponent = categoryData.icon;
-                    
+                    const choresForCategory = getChoresForCategory(categoryName);
                     return (
                       <Card key={categoryName} className="overflow-hidden">
                         <CardHeader className={`bg-gradient-to-r ${categoryData.color} text-white`}>
@@ -1129,19 +1163,40 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                         </CardHeader>
                         <CardContent className="p-4 sm:p-6">
                           <div className="grid gap-3 sm:gap-4">
-                            {categoryData.chores.map((chore, index) => (
-                              <div key={index} className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-900/50 rounded-lg border border-white/20 dark:border-gray-800/20">
+                            {choresForCategory.map((chore, index) => (
+                              <div key={`${chore.title}-${index}`} className="flex items-center justify-between p-3 bg-white/50 dark:bg-gray-900/50 rounded-lg border border-white/20 dark:border-gray-800/20">
                                 <div className="flex items-center gap-3">
                                   <span className="text-2xl">{chore.emoji}</span>
                                   <div>
                                     <h4 className="font-medium">{chore.title}</h4>
-                                    <p className="text-sm text-muted-foreground">{chore.description}</p>
+                                    <p className="text-sm text-muted-foreground">{chore.description || '—'}</p>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <Badge variant="outline" className={`text-xs ${getDifficultyColor(chore.difficulty)}`}>
                                     {getDifficultyIcon(chore.difficulty)} {chore.difficulty}
                                   </Badge>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="shrink-0"
+                                    onClick={() => {
+                                      setNewChore({
+                                        title: chore.title,
+                                        description: chore.description,
+                                        category: categoryName,
+                                        difficulty: chore.difficulty,
+                                        emoji: chore.emoji,
+                                        recurring: 'none',
+                                        recurringDays: [new Date().getDay()]
+                                      });
+                                      setSelectedDateForAdd(null);
+                                      setIsAddChoreOpen(true);
+                                    }}
+                                  >
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add
+                                  </Button>
                                 </div>
                               </div>
                             ))}

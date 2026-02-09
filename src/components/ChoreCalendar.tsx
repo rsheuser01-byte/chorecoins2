@@ -128,7 +128,19 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   };
 
   const getChoresForDate = (date: Date) => {
-    return chores.filter(chore => isSameDay(chore.dueDate, date) || recurringMatchesDate(chore, date));
+    return chores.filter(chore => {
+      // One-time chore: show if due on this date
+      if (!chore.recurring || chore.recurring === 'none') {
+        return isSameDay(chore.dueDate, date);
+      }
+      // Recurring chore: show only if it matches this date AND there is no instance for this date
+      // (if an instance exists, we show that instead via the one-time check above)
+      if (!recurringMatchesDate(chore, date)) return false;
+      const hasInstanceForDate = chores.some(
+        c => (c.recurring === 'none' || !c.recurring) && c.title === chore.title && isSameDay(c.dueDate, date)
+      );
+      return !hasInstanceForDate;
+    });
   };
 
   const getChoresForWeek = (date: Date) => {
@@ -186,49 +198,43 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   };
 
   const toggleChoreComplete = (chore: Chore) => {
-    // Only create a new instance if:
-    // 1. The chore is recurring (not 'none')
-    // 2. The selected date is different from the original dueDate
-    // 3. The chore is being marked as complete (not uncompleting)
-    // 4. There isn't already an instance for this date
-    if (chore.recurring && chore.recurring !== 'none' && !isSameDay(chore.dueDate, selectedDate) && !chore.completed) {
-      // Check if an instance already exists for this date
-      const existingInstance = chores.find(c => 
-        c.title === chore.title && 
-        isSameDay(c.dueDate, selectedDate) && 
-        c.recurring === 'none'
+    // Recurring chore: never toggle the template. Always use an instance for the selected date
+    // so that completing on one day doesn't mark other days complete.
+    if (chore.recurring && chore.recurring !== 'none') {
+      const existingInstance = chores.find(c =>
+        (c.recurring === 'none' || !c.recurring) &&
+        c.title === chore.title &&
+        isSameDay(c.dueDate, selectedDate)
       );
-      
-      if (!existingInstance) {
-        // Create a one-time instance for the selected date
-        const instance: Chore = {
-          ...chore,
-          id: Date.now().toString(),
-          dueDate: selectedDate,
-          completed: true,
-          recurring: 'none',
-        };
-        onChoreUpdate([...chores, instance]);
-        onChoreComplete(instance);
-        return;
-      } else {
-        // Toggle the existing instance instead
-        const updatedChore = { ...existingInstance, completed: !existingInstance.completed };
-        const updatedChores = chores.map(c => c.id === existingInstance.id ? updatedChore : c);
+
+      if (existingInstance) {
+        const updatedInstance = { ...existingInstance, completed: !existingInstance.completed };
+        const updatedChores = chores.map(c => c.id === existingInstance.id ? updatedInstance : c);
         onChoreUpdate(updatedChores);
-        
         if (!existingInstance.completed) {
-          onChoreComplete(updatedChore);
+          onChoreComplete(updatedInstance);
         }
         return;
       }
+
+      // No instance for this date: create one (user is marking this day complete)
+      const instance: Chore = {
+        ...chore,
+        id: Date.now().toString(),
+        dueDate: new Date(selectedDate),
+        completed: true,
+        recurring: 'none',
+      };
+      onChoreUpdate([...chores, instance]);
+      onChoreComplete(instance);
+      return;
     }
 
-    // For non-recurring chores or recurring chores on their original date, just toggle
+    // One-time chore: toggle in place
     const updatedChore = { ...chore, completed: !chore.completed };
     const updatedChores = chores.map(c => c.id === chore.id ? updatedChore : c);
     onChoreUpdate(updatedChores);
-    
+
     if (!chore.completed) {
       onChoreComplete(updatedChore);
     }
