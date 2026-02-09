@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, Trophy, Home, Car, Utensils, Shirt, BookOpen, Heart, DollarSign, Edit } from 'lucide-react';
+import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, Trophy, Home, Car, Utensils, Shirt, BookOpen, Heart, DollarSign, Edit, Trash2 } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
 import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalendar';
 import { ChoreCompletionAnimation } from '@/components/ChoreCompletionAnimation';
@@ -113,12 +113,30 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   return oldChores.map(chore => {
     const recurring = chore.recurring || 'none';
     const recurringDays = Array.isArray(chore.recurringDays) ? chore.recurringDays : [];
+    
+    // Ensure dueDate is always a Date object
+    let dueDate: Date;
+    if (chore.dueDate instanceof Date) {
+      dueDate = chore.dueDate;
+    } else if (chore.dueDate) {
+      dueDate = new Date(chore.dueDate);
+    } else if (chore.date) {
+      dueDate = new Date(chore.date);
+    } else {
+      dueDate = new Date();
+    }
+    
+    // Validate the date
+    if (isNaN(dueDate.getTime())) {
+      dueDate = new Date();
+    }
+    
     return ({
       ...chore,
       difficulty: chore.difficulty || 'medium',
       emoji: chore.emoji || '✅',
       description: chore.description || '',
-      dueDate: chore.dueDate ? new Date(chore.dueDate) : (chore.date ? new Date(chore.date) : new Date()),
+      dueDate,
       priority: chore.priority || 'medium',
       category: chore.category || '🏠 Home',
       recurring,
@@ -185,16 +203,31 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const addChore = () => {
     if (newChore.title.trim()) {
+      // Ensure dueDate is a proper Date object
+      let dueDate: Date;
+      if (selectedDateForAdd instanceof Date) {
+        dueDate = selectedDateForAdd;
+      } else if (selectedDateForAdd) {
+        dueDate = new Date(selectedDateForAdd);
+      } else {
+        dueDate = new Date();
+      }
+      
+      // Validate date
+      if (isNaN(dueDate.getTime())) {
+        dueDate = new Date();
+      }
+      
       const chore: Chore = {
         id: Date.now().toString(),
-        title: newChore.title,
-        description: newChore.description,
+        title: newChore.title.trim(),
+        description: newChore.description?.trim() || '',
         completed: false,
-        dueDate: selectedDateForAdd ? selectedDateForAdd : new Date(),
+        dueDate,
         recurring: newChore.recurring,
         recurringDays: newChore.recurring === 'custom' ? newChore.recurringDays : undefined,
         difficulty: newChore.difficulty,
-        emoji: newChore.emoji,
+        emoji: newChore.emoji || '✅',
         priority: 'medium',
         category: newChore.category
       };
@@ -219,11 +252,18 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const editChore = () => {
     if (editingChore) {
+      // Ensure all fields are properly set, especially dueDate which needs to be a Date object
+      const updatedChore: Chore = {
+        ...editingChore,
+        dueDate: editingChore.dueDate instanceof Date ? editingChore.dueDate : new Date(editingChore.dueDate),
+      };
+      
       const updatedChores = choreData.map(c => 
-        c.id === editingChore.id ? editingChore : c
-    );
-    setChoreData(updatedChores);
-    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
+        c.id === updatedChore.id ? updatedChore : c
+      );
+      
+      setChoreData(updatedChores);
+      safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
       setIsEditChoreOpen(false);
       setEditingChore(null);
     }
@@ -232,6 +272,12 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   const openEditDialog = (chore: Chore) => {
     setEditingChore({ ...chore });
     setIsEditChoreOpen(true);
+  };
+
+  const deleteChore = (choreId: string) => {
+    const updatedChores = choreData.filter(c => c.id !== choreId);
+    setChoreData(updatedChores);
+    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
   };
 
   const saveWeeklyAllowance = (newAmount: number) => {
@@ -259,32 +305,40 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   };
 
   const handleChoreUpdate = (updatedChores: BaseChore[]) => {
-    setChoreData(updatedChores as Chore[]);
-    safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
+    // Ensure all dates are Date objects before saving
+    const choresWithDates = (updatedChores as Chore[]).map(chore => ({
+      ...chore,
+      dueDate: chore.dueDate instanceof Date ? chore.dueDate : new Date(chore.dueDate)
+    }));
+    setChoreData(choresWithDates);
+    safeLocalStorage.setItem('chores', JSON.stringify(choresWithDates));
   };
 
   const handleChoreComplete = (chore: Chore) => {
     try {
-      // Show animation for chore completion
-      setChoreAnimation({ show: true, title: chore.title });
-      
       // Award chore completion (handles XP and achievements internally)
       completeChore(0);
       
-      // Check if all chores are now completed to award weekly allowance
-      const updatedChores = choreData.map(c => c.id === chore.id ? { ...c, completed: true } : c);
-      const allCompleted = updatedChores.every(c => c.completed);
-      
-      if (allCompleted && updatedChores.length > 0) {
-        // Show celebration for earning allowance
-        setCelebration({
-          show: true,
-          message: `Amazing! You completed all chores and earned your $${weeklyAllowance} weekly allowance!`,
-          chore: 'Weekly Allowance'
-        });
+      // Check if all TODAY's chores are now completed to award weekly allowance
+      // Use a function to get the latest state (after toggleChore has updated it)
+      setChoreData(currentChores => {
+        const todayChores = currentChores.filter(c => isToday(c.dueDate));
+        const allTodayCompleted = todayChores.length > 0 && todayChores.every(c => c.completed);
         
-        setTimeout(() => setCelebration({ show: false, message: '', chore: '' }), 3000);
-      }
+        if (allTodayCompleted) {
+          // Show celebration for earning allowance
+          setCelebration({
+            show: true,
+            message: `Amazing! You completed all chores and earned your $${weeklyAllowance} weekly allowance!`,
+            chore: 'Weekly Allowance'
+          });
+          
+          setTimeout(() => setCelebration({ show: false, message: '', chore: '' }), 3000);
+        }
+        
+        // Don't modify the state here - toggleChore already did that
+        return currentChores;
+      });
     } catch (error) {
       console.error('Error completing chore:', error);
     }
@@ -294,6 +348,8 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     const chore = choreData.find(c => c.id === choreId);
     if (!chore) return;
     
+    // Don't create duplicates for recurring chores - just toggle the existing one
+    // The calendar view handles creating instances for different dates
     const updatedChores = choreData.map(c => 
       c.id === choreId ? { ...c, completed: !c.completed } : c
     );
@@ -422,7 +478,22 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                     </DialogContent>
                   </Dialog>
                   
-                  <Dialog open={isAddChoreOpen} onOpenChange={setIsAddChoreOpen}>
+                  <Dialog open={isAddChoreOpen} onOpenChange={(open) => {
+                    setIsAddChoreOpen(open);
+                    if (!open) {
+                      // Reset form when dialog closes
+                      setNewChore({
+                        title: '',
+                        description: '',
+                        category: '🏠 Home',
+                        difficulty: 'easy' as 'easy' | 'medium' | 'hard',
+                        emoji: '✅',
+                        recurring: 'none',
+                        recurringDays: [new Date().getDay()]
+                      });
+                      setSelectedDateForAdd(null);
+                    }
+                  }}>
                     <DialogTrigger asChild>
                       <Button className="bg-money-green hover:bg-money-green/90 text-white">
                         <Plus className="h-4 w-4 mr-2" />
@@ -614,7 +685,13 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                   </Dialog>
 
                   {/* Edit Chore Dialog */}
-                  <Dialog open={isEditChoreOpen} onOpenChange={setIsEditChoreOpen}>
+                  <Dialog open={isEditChoreOpen} onOpenChange={(open) => {
+                    setIsEditChoreOpen(open);
+                    if (!open) {
+                      // Reset editing state when dialog closes
+                      setEditingChore(null);
+                    }
+                  }}>
                     <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
@@ -631,7 +708,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                           {/* Category Selection */}
                           <div className="space-y-2">
                             <Label htmlFor="edit-category">Category</Label>
-                            <Select value={editingChore.category} onValueChange={(value) => setEditingChore({ ...editingChore, category: value })}>
+                            <Select 
+                              value={editingChore.category || '🏠 Home'} 
+                              onValueChange={(value) => {
+                                if (editingChore) {
+                                  setEditingChore({ ...editingChore, category: value });
+                                }
+                              }}
+                            >
                               <SelectTrigger>
                                 <SelectValue />
                               </SelectTrigger>
@@ -654,13 +738,17 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                     variant="ghost"
                                     size="sm"
                                     className="justify-start h-auto p-2 text-left hover:bg-money-green/10"
-                                    onClick={() => setEditingChore({
-                                      ...editingChore,
-                                      title: chore.title,
-                                      description: chore.description,
-                                      difficulty: chore.difficulty as 'easy' | 'medium' | 'hard',
-                                      emoji: chore.emoji
-                                    })}
+                                    onClick={() => {
+                                      if (editingChore) {
+                                        setEditingChore({
+                                          ...editingChore,
+                                          title: chore.title,
+                                          description: chore.description,
+                                          difficulty: chore.difficulty as 'easy' | 'medium' | 'hard',
+                                          emoji: chore.emoji
+                                        });
+                                      }
+                                    }}
                                   >
                                     <div className="flex items-center gap-2 w-full">
                                       <span className="text-lg">{chore.emoji}</span>
@@ -688,8 +776,12 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                             <Label htmlFor="edit-title">Chore Title</Label>
                             <Input
                               id="edit-title"
-                              value={editingChore.title}
-                              onChange={(e) => setEditingChore({ ...editingChore, title: e.target.value })}
+                              value={editingChore.title || ''}
+                              onChange={(e) => {
+                                if (editingChore) {
+                                  setEditingChore({ ...editingChore, title: e.target.value });
+                                }
+                              }}
                               placeholder="e.g., Make Bed"
                             />
                           </div>
@@ -698,8 +790,12 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                             <Label htmlFor="edit-description">Description (Optional)</Label>
                             <Textarea
                               id="edit-description"
-                              value={editingChore.description}
-                              onChange={(e) => setEditingChore({ ...editingChore, description: e.target.value })}
+                              value={editingChore.description || ''}
+                              onChange={(e) => {
+                                if (editingChore) {
+                                  setEditingChore({ ...editingChore, description: e.target.value });
+                                }
+                              }}
                               placeholder="Add a fun description..."
                               className="min-h-[60px]"
                             />
@@ -708,7 +804,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                           <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-2">
                               <Label htmlFor="edit-difficulty">Difficulty</Label>
-                              <Select value={editingChore.difficulty} onValueChange={(value: 'easy' | 'medium' | 'hard') => setEditingChore({ ...editingChore, difficulty: value })}>
+                              <Select 
+                                value={editingChore.difficulty || 'medium'} 
+                                onValueChange={(value: 'easy' | 'medium' | 'hard') => {
+                                  if (editingChore) {
+                                    setEditingChore({ ...editingChore, difficulty: value });
+                                  }
+                                }}
+                              >
                                 <SelectTrigger>
                                   <SelectValue />
                                 </SelectTrigger>
@@ -720,17 +823,21 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                               </Select>
                             </div>
                             
-                            <div className="space-y-2">
-                              <Label htmlFor="edit-emoji">Emoji</Label>
-                              <Input
-                                id="edit-emoji"
-                                value={editingChore.emoji}
-                                onChange={(e) => setEditingChore({ ...editingChore, emoji: e.target.value })}
-                                placeholder="🧹"
-                                className="text-center"
-                                maxLength={2}
-                              />
-                            </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="edit-emoji">Emoji</Label>
+                            <Input
+                              id="edit-emoji"
+                              value={editingChore.emoji || ''}
+                              onChange={(e) => {
+                                if (editingChore) {
+                                  setEditingChore({ ...editingChore, emoji: e.target.value });
+                                }
+                              }}
+                              placeholder="🧹"
+                              className="text-center"
+                              maxLength={2}
+                            />
+                          </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3">
@@ -738,13 +845,15 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                               <Label htmlFor="edit-recurring">Repeat</Label>
                           <Select 
                                 value={editingChore.recurring || 'none'} 
-                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') => 
-                                  setEditingChore(prev => prev ? ({
-                                    ...prev,
-                                    recurring: value,
-                                    recurringDays: value === 'custom' ? (prev.recurringDays?.length ? prev.recurringDays : [new Date().getDay()]) : prev.recurringDays
-                                  }) : prev)
-                                }
+                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') => {
+                                  if (editingChore) {
+                                    setEditingChore({
+                                      ...editingChore,
+                                      recurring: value,
+                                      recurringDays: value === 'custom' ? (editingChore.recurringDays?.length ? editingChore.recurringDays : [new Date().getDay()]) : editingChore.recurringDays
+                                    });
+                                  }
+                                }}
                               >
                                 <SelectTrigger>
                                   <SelectValue />
@@ -769,12 +878,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                     type="button"
                                     size="sm"
                                     variant={editingChore.recurringDays?.includes(day.value) ? 'default' : 'outline'}
-                                    onClick={() =>
-                                      setEditingChore(prev => prev ? ({
-                                        ...prev,
-                                        recurringDays: toggleRecurringDay(prev.recurringDays || [], day.value)
-                                      }) : prev)
-                                    }
+                                    onClick={() => {
+                                      if (editingChore) {
+                                        setEditingChore({
+                                          ...editingChore,
+                                          recurringDays: toggleRecurringDay(editingChore.recurringDays || [], day.value)
+                                        });
+                                      }
+                                    }}
                                   >
                                     {day.label}
                                   </Button>
@@ -979,6 +1090,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                 className="h-8 w-8 p-0 hover:bg-muted"
                               >
                                 <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => deleteChore(chore.id)}
+                                className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Trash2 className="h-4 w-4" />
                               </Button>
                           {chore.completed && (
                                 <Badge className="bg-money-gold text-white text-xs flex items-center gap-1">

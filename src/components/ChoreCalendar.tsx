@@ -90,25 +90,40 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   
   const recurringMatchesDate = (chore: Chore, date: Date) => {
     if (!chore.recurring || chore.recurring === 'none') return false;
+    
+    // Ensure dates are Date objects
+    const startDate = chore.dueDate instanceof Date ? chore.dueDate : new Date(chore.dueDate);
+    const targetDate = date instanceof Date ? date : new Date(date);
+    
     // Only consider dates on/after the chore's start date
-    const start = new Date(chore.dueDate);
-    const target = new Date(date);
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const target = new Date(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate());
+    
     if (target < start) return false;
-    // Daily: every day after start
-    if (chore.recurring === 'daily') return true;
+    
+    // Daily: every day on/after start
+    if (chore.recurring === 'daily') {
+      return true;
+    }
+    
     // Weekly: every 7 days from start
     if (chore.recurring === 'weekly') {
-      const diffDays = Math.floor((target.setHours(0,0,0,0) as unknown as number - start.setHours(0,0,0,0) as unknown as number) / (1000 * 60 * 60 * 24));
-      return diffDays % 7 === 0;
+      const diffTime = target.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays % 7 === 0;
     }
+    
+    // Custom: matches specific days of the week
     if (chore.recurring === 'custom') {
       const days = chore.recurringDays || [];
       return days.includes(target.getDay());
     }
+    
     // Monthly: same day-of-month each month (simple heuristic)
     if (chore.recurring === 'monthly') {
       return target.getDate() === start.getDate();
     }
+    
     return false;
   };
 
@@ -171,21 +186,45 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   };
 
   const toggleChoreComplete = (chore: Chore) => {
-    // If this is a recurring chore and we're viewing a date different from the original dueDate,
-    // create a one-time instance for the selected date instead of toggling the template.
-    if (chore.recurring && chore.recurring !== 'none' && !isSameDay(chore.dueDate, selectedDate)) {
-      const instance: Chore = {
-        ...chore,
-        id: Date.now().toString(),
-        dueDate: selectedDate,
-        completed: true,
-        recurring: 'none',
-      };
-      onChoreUpdate([...chores, instance]);
-      onChoreComplete(instance);
-      return;
+    // Only create a new instance if:
+    // 1. The chore is recurring (not 'none')
+    // 2. The selected date is different from the original dueDate
+    // 3. The chore is being marked as complete (not uncompleting)
+    // 4. There isn't already an instance for this date
+    if (chore.recurring && chore.recurring !== 'none' && !isSameDay(chore.dueDate, selectedDate) && !chore.completed) {
+      // Check if an instance already exists for this date
+      const existingInstance = chores.find(c => 
+        c.title === chore.title && 
+        isSameDay(c.dueDate, selectedDate) && 
+        c.recurring === 'none'
+      );
+      
+      if (!existingInstance) {
+        // Create a one-time instance for the selected date
+        const instance: Chore = {
+          ...chore,
+          id: Date.now().toString(),
+          dueDate: selectedDate,
+          completed: true,
+          recurring: 'none',
+        };
+        onChoreUpdate([...chores, instance]);
+        onChoreComplete(instance);
+        return;
+      } else {
+        // Toggle the existing instance instead
+        const updatedChore = { ...existingInstance, completed: !existingInstance.completed };
+        const updatedChores = chores.map(c => c.id === existingInstance.id ? updatedChore : c);
+        onChoreUpdate(updatedChores);
+        
+        if (!existingInstance.completed) {
+          onChoreComplete(updatedChore);
+        }
+        return;
+      }
     }
 
+    // For non-recurring chores or recurring chores on their original date, just toggle
     const updatedChore = { ...chore, completed: !chore.completed };
     const updatedChores = chores.map(c => c.id === chore.id ? updatedChore : c);
     onChoreUpdate(updatedChores);
