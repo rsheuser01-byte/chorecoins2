@@ -13,7 +13,7 @@ import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, T
 import { useGamification } from '@/hooks/useGamification';
 import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalendar';
 import { ChoreCompletionAnimation } from '@/components/ChoreCompletionAnimation';
-import { format, isToday } from 'date-fns';
+import { format, isToday, isSameDay, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
 import { safeLocalStorage } from '@/lib/safeLocalStorage';
 
@@ -78,7 +78,7 @@ const choreCategories = {
     chores: [
       { title: 'Organize Desk', difficulty: 'easy', emoji: '📚', description: 'Ready to learn!' },
       { title: 'Complete Homework', difficulty: 'medium', emoji: '✏️', description: 'Knowledge is power' },
-      { title: 'Read for 30 mins', difficulty: 'medium', emoji: '📖', description: 'Feed your mind' },
+      { title: 'Read for 15 mins', difficulty: 'medium', emoji: '📖', description: 'Feed your mind' },
       { title: 'Practice Instrument', difficulty: 'medium', emoji: '🎵', description: 'Make beautiful music' }
     ]
   },
@@ -307,6 +307,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const editChore = () => {
     if (editingChore) {
+      const recurring = editingChore.recurring ?? 'none';
       // Ensure all fields are properly set; dueDate must be a Date object
       const updatedChore: Chore = {
         ...editingChore,
@@ -316,8 +317,10 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         description: editingChore.description ?? '',
         emoji: editingChore.emoji ?? '✅',
         category: editingChore.category ?? '🏠 Home',
-        recurring: editingChore.recurring ?? 'none',
-        recurringDays: editingChore.recurring === 'custom' ? (editingChore.recurringDays ?? [new Date().getDay()]) : editingChore.recurringDays,
+        recurring,
+        recurringDays: recurring === 'custom' ? (editingChore.recurringDays ?? [new Date().getDay()]) : editingChore.recurringDays,
+        // Recurring template must start unchecked so each day is completed separately
+        completed: recurring !== 'none' ? false : (editingChore.completed ?? false),
       };
       
       const updatedChores = choreData.map(c => 
@@ -337,7 +340,14 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   };
 
   const deleteChore = (choreId: string) => {
-    const updatedChores = choreData.filter(c => c.id !== choreId);
+    const chore = choreData.find(c => c.id === choreId);
+    if (!chore) return;
+    // For recurring chores (e.g. daily), remove the template and all instances of that type (same title + category)
+    const normalizedTitle = chore.title.trim().toLowerCase();
+    const category = chore.category ?? '';
+    const updatedChores = choreData.filter(
+      c => !(c.title.trim().toLowerCase() === normalizedTitle && (c.category ?? '') === category)
+    );
     setChoreData(updatedChores);
     safeLocalStorage.setItem('chores', JSON.stringify(updatedChores));
   };
@@ -378,6 +388,8 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
 
   const handleChoreComplete = (chore: Chore) => {
     try {
+      // Show completion animation (for both Today tab and Calendar tab)
+      setChoreAnimation({ show: true, title: chore.title });
       // Award chore completion (handles XP and achievements internally)
       completeChore(0);
     } catch (error) {
@@ -412,10 +424,52 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   const completedChores = todayChores.filter(chore => chore.completed).length;
   const totalChores = todayChores.length;
   const progressPercentage = totalChores > 0 ? (completedChores / totalChores) * 100 : 0;
-  
-  // Weekly allowance calculation - earn full allowance if all chores completed
-  const weeklyEarnings = completedChores === totalChores && totalChores > 0 ? weeklyAllowance : 0;
-  const allowanceProgress = totalChores > 0 ? (completedChores / totalChores) * 100 : 0;
+
+  // Recurring chore matches date (mirrors ChoreCalendar logic)
+  const recurringMatchesDate = (chore: Chore, date: Date): boolean => {
+    if (!chore.recurring || chore.recurring === 'none') return false;
+    const startDate = chore.dueDate instanceof Date ? chore.dueDate : new Date(chore.dueDate);
+    const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const start = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    if (target < start) return false;
+    if (chore.recurring === 'daily') return true;
+    if (chore.recurring === 'weekly') {
+      const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays % 7 === 0;
+    }
+    if (chore.recurring === 'custom') return (chore.recurringDays ?? []).includes(target.getDay());
+    if (chore.recurring === 'monthly') return target.getDate() === start.getDate();
+    return false;
+  };
+
+  // Weekly allowance: only on Saturday, and only when all chores for the week are completed
+  const now = new Date();
+  const isSaturday = now.getDay() === 6;
+  const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+  const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
+
+  const weekOccurrences: { completed: boolean }[] = [];
+  for (let d = new Date(weekStart); d <= weekEnd; d = addDays(d, 1)) {
+    const date = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    choreData.forEach((chore) => {
+      if (!chore.recurring || chore.recurring === 'none') {
+        if (isSameDay(chore.dueDate, date)) weekOccurrences.push({ completed: chore.completed });
+        return;
+      }
+      if (!recurringMatchesDate(chore, date)) return;
+      const instance = choreData.find(
+        (c) => (c.recurring === 'none' || !c.recurring) && c.title === chore.title && isSameDay(c.dueDate, date)
+      );
+      weekOccurrences.push({ completed: instance ? instance.completed : false });
+    });
+  }
+
+  const weekCompletedCount = weekOccurrences.filter((o) => o.completed).length;
+  const weekTotal = weekOccurrences.length;
+  const allWeekChoresCompleted = weekTotal > 0 && weekCompletedCount === weekTotal;
+
+  const weeklyEarnings = isSaturday && allWeekChoresCompleted ? weeklyAllowance : 0;
+  const allowanceProgress = weekTotal > 0 ? (weekCompletedCount / weekTotal) * 100 : 0;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-emerald-50 to-teal-100 dark:from-green-900 dark:via-emerald-900 dark:to-teal-900">
@@ -1023,7 +1077,13 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                       <div className="text-lg sm:text-2xl font-bold text-money-green">${weeklyEarnings}</div>
                       <Progress value={allowanceProgress} className="mt-2 h-2" />
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
-                        {weeklyEarnings > 0 ? 'All chores completed! 🎉' : `${completedChores}/${totalChores} chores done`} <Trophy className="h-3 w-3" />
+                        {weeklyEarnings > 0
+                          ? 'All week done! Allowance earned 🎉'
+                          : isSaturday
+                            ? (weekTotal > 0 ? `${weekCompletedCount}/${weekTotal} chores this week` : 'No chores this week')
+                            : (weekTotal > 0 ? `${weekCompletedCount}/${weekTotal} this week — allowance Saturday` : 'Complete all chores by Saturday')
+                        }
+                        <Trophy className="h-3 w-3" />
                       </p>
                     </CardContent>
                   </Card>

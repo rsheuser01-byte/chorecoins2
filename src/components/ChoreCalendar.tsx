@@ -192,8 +192,13 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
 
   // Editing is delegated to parent to use the exact same dialog UI
 
-  const handleDeleteChore = (id: string) => {
-    const updatedChores = chores.filter(chore => chore.id !== id);
+  const handleDeleteChore = (chore: Chore) => {
+    // Remove this chore and all others of the same type (title + category) so recurring series is fully deleted
+    const normalizedTitle = chore.title.trim().toLowerCase();
+    const category = chore.category ?? '';
+    const updatedChores = chores.filter(
+      c => !(c.title.trim().toLowerCase() === normalizedTitle && (c.category ?? '') === category)
+    );
     onChoreUpdate(updatedChores);
   };
 
@@ -390,7 +395,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                                 variant="ghost" 
                                 size="sm" 
                                 className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                                onClick={() => handleDeleteChore(chore.id)}
+                                onClick={() => handleDeleteChore(chore)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
