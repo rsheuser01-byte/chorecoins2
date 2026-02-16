@@ -203,7 +203,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     category: '🏠 Home',
     difficulty: 'easy' as 'easy' | 'medium' | 'hard',
     emoji: '✅',
-    recurring: 'none' as 'none' | 'daily' | 'weekly' | 'monthly' | 'custom',
+    recurring: 'none' as 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom',
     recurringDays: [new Date().getDay()]
   });
 
@@ -436,6 +436,10 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
     if (chore.recurring === 'weekly') {
       const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
       return diffDays >= 0 && diffDays % 7 === 0;
+    }
+    if (chore.recurring === 'biweekly') {
+      const diffDays = Math.floor((target.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays % 14 === 0;
     }
     if (chore.recurring === 'custom') return (chore.recurringDays ?? []).includes(target.getDay());
     if (chore.recurring === 'monthly') return target.getDate() === start.getDate();
@@ -707,7 +711,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                             <Label htmlFor="recurring">Repeat</Label>
                           <Select
                             value={newChore.recurring}
-                            onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') =>
+                            onValueChange={(value: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom') =>
                               setNewChore(prev => ({
                                 ...prev,
                                 recurring: value,
@@ -722,8 +726,9 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                 <SelectItem value="none">No repeat</SelectItem>
                                 <SelectItem value="daily">Daily</SelectItem>
                                 <SelectItem value="weekly">Weekly</SelectItem>
+                                <SelectItem value="biweekly">Biweekly (every 2 weeks)</SelectItem>
                                 <SelectItem value="monthly">Monthly</SelectItem>
-                              <SelectItem value="custom">Custom days</SelectItem>
+                                <SelectItem value="custom">Custom days</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
@@ -933,7 +938,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                               <Label htmlFor="edit-recurring">Repeat</Label>
                           <Select 
                                 value={editingChore.recurring || 'none'} 
-                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'monthly' | 'custom') => {
+                                onValueChange={(value: 'none' | 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom') => {
                                   if (editingChore) {
                                     setEditingChore({
                                       ...editingChore,
@@ -950,6 +955,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
                                   <SelectItem value="none">No repeat</SelectItem>
                                   <SelectItem value="daily">Daily</SelectItem>
                                   <SelectItem value="weekly">Weekly</SelectItem>
+                                  <SelectItem value="biweekly">Biweekly (every 2 weeks)</SelectItem>
                                   <SelectItem value="monthly">Monthly</SelectItem>
                                   <SelectItem value="custom">Custom days</SelectItem>
                                 </SelectContent>

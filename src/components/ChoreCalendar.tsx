@@ -29,7 +29,7 @@ export interface Chore {
   description?: string;
   completed: boolean;
   dueDate: Date;
-  recurring?: 'daily' | 'weekly' | 'monthly' | 'custom' | 'none';
+  recurring?: 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'custom' | 'none';
   recurringDays?: number[];
   priority: 'low' | 'medium' | 'high';
   category: string;
@@ -111,6 +111,13 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
       const diffTime = target.getTime() - start.getTime();
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
       return diffDays >= 0 && diffDays % 7 === 0;
+    }
+
+    // Biweekly: every 14 days from start
+    if (chore.recurring === 'biweekly') {
+      const diffTime = target.getTime() - start.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays >= 0 && diffDays % 14 === 0;
     }
     
     // Custom: matches specific days of the week
@@ -396,7 +403,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
                                 <Badge variant="outline">{chore.category}</Badge>
                                 {chore.recurring !== 'none' && (
                                   <Badge variant="outline" className="bg-blue-100 text-blue-800">
-                                    {chore.recurring === 'custom' ? 'custom days' : chore.recurring}
+                                    {chore.recurring === 'custom' ? 'custom days' : chore.recurring === 'biweekly' ? 'every 2 weeks' : chore.recurring}
                                   </Badge>
                                 )}
                               </div>
