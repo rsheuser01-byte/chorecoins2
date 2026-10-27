@@ -7,6 +7,8 @@ import { observableStorage, type ObservableStorage } from '@/lib/observableStora
 import { createAccountSync, syncedProgressKeys, type ProgressData, type ProgressApi } from '@/lib/accountSync';
 import { previewLegacyImport } from '@/lib/legacyImport';
 import { validateProgressPayloads } from '@/lib/progressValidation';
+import { createLocalProgress } from '@/lib/localProgress';
+import { isCloudSyncEnabled } from '@/lib/cloudFeature';
 import { createAccountProgressApi } from '@/services/accountProgressApi';
 
 const AccountStorageContext = createContext<ObservableStorage | null>(null);
@@ -27,6 +29,49 @@ function LegacyNotice() {
 function GuestSession({ children }: { children: ReactNode }) {
   const storage = useMemo(() => observableStorage(createAccountStorage(safeLocalStorage, null)), []);
   return <AccountStorageContext.Provider value={storage}><LegacyNotice />{children}</AccountStorageContext.Provider>;
+}
+function LocalSession({ session, children }: { session: Session; children: ReactNode }) {
+  const owner = session.user.id;
+  const active = useRef(true);
+  const depth = useRef(0);
+  const [locked, setLocked] = useState(false);
+  const [draft, setDraft] = useState<ProgressData>({});
+  const [error, setError] = useState<string | null>(null);
+  const initialized = useMemo(() => {
+    try { return { value: createLocalProgress(window.localStorage, owner), error: null }; }
+    catch { return { value: null, error: 'Local progress could not be opened safely. Existing bytes are preserved; export them before repairing browser storage.' }; }
+  }, [owner]);
+  const storage = useMemo(() => observableStorage({
+    getItem: key => initialized.value?.getItem(key) ?? null,
+    setItem(key, value) { if (!active.current) return; try { initialized.value!.setItem(key, value); } catch { setDraft(previous => ({ ...previous, [key]: value })); setError('This change could not be saved. Editing is paused; your previously saved progress is preserved.'); if (depth.current) throw new Error('Local progress write failed'); } },
+    removeItem(key) { if (!active.current) return; try { initialized.value!.removeItem(key); } catch { setError('This change could not be saved. Editing is paused.'); if (depth.current) throw new Error('Local progress write failed'); } },
+    transaction(work) { if (!active.current) return; depth.current++; try { initialized.value!.transaction(work); } catch (failure) { setDraft((failure as { unsavedProgress?: ProgressData }).unsavedProgress || {}); setError('The complete action could not be saved. No partial progress was stored. Editing is paused.'); } finally { depth.current--; } },
+  }), [initialized]);
+  useEffect(() => {
+    active.current = true;
+    let release: (() => void) | undefined;
+    if (!navigator.locks) setError('This browser cannot safely coordinate local account storage. Use a browser with Web Locks support; existing data is preserved.');
+    else void navigator.locks.request(`chorecoins-local:${owner}`, { mode: 'exclusive', ifAvailable: true }, async lock => {
+      if (!active.current) return;
+      if (!lock) { setError('This local account is already open in another tab. Close that tab and reload here.'); return; }
+      setLocked(true);
+      await new Promise<void>(resolve => { release = resolve; });
+    }).catch(() => { if (active.current) setError('Unable to lock local storage safely. Reload before editing.'); });
+    return () => { active.current = false; release?.(); };
+  }, [owner]);
+  const exportLocal = () => {
+    const scoped = createAccountStorage(safeLocalStorage, owner);
+    download('chorecoins-local-account-backup.json', { version: 1, localJournal: window.localStorage.getItem(`chorecoins:local:v1:${encodeURIComponent(owner)}`), previousAccountProgress: readLegacyProgress(scoped), unsavedDraft: draft });
+  };
+  return <AccountStorageContext.Provider value={storage}>
+    <LegacyNotice />
+    <aside className="p-3 border-b bg-muted text-sm" role="status">
+      Local-only progress: saved on this browser. Cloud syncing is not enabled. Signing in on another device will not copy these chores.
+      {' '}<button className="underline" onClick={exportLocal}>Download account backup</button>
+      <p>Do not clear browser storage. Local account separation is not encryption or protection from someone using this browser.</p>
+    </aside>
+    {error || initialized.error ? <section role="alert">{error || initialized.error}</section> : locked ? children : <p role="status">Opening local account storage…</p>}
+  </AccountStorageContext.Provider>;
 }
 function CloudSession({ session, children }: { session: Session; children: ReactNode }) {
   const { logout } = useAuth();
@@ -50,7 +95,12 @@ function CloudSession({ session, children }: { session: Session; children: React
   const [importDismissed, setImportDismissed] = useState(false);
   const [ownsLegacy, setOwnsLegacy] = useState(false);
   const local = useMemo(() => createAccountStorage(safeLocalStorage, userId), [userId]);
-  const candidates = useMemo(() => ({ account: previewLegacyImport(local), shared: previewLegacyImport(safeLocalStorage) }), [local]);
+  const candidates = useMemo(() => {
+    let account;
+    try { account = previewLegacyImport(createLocalProgress(window.localStorage, userId)); }
+    catch { account = { data: {}, invalid: ['Preserved local account journal needs manual review'], adjustments: [] }; }
+    return { account, shared: previewLegacyImport(safeLocalStorage) };
+  }, [local, userId]);
   const [source, setSource] = useState<'account' | 'shared'>(() => Object.keys(candidates.account.data).length ? 'account' : 'shared');
   const transactionDepth = useRef(0);
   const storage = useMemo(() => {
@@ -164,6 +214,7 @@ function CloudSession({ session, children }: { session: Session; children: React
 export function AccountDataBoundary({ children }: { children: ReactNode }) {
   const { session, isLoading, authStatusError } = useAuth();
   if (isLoading) return <section role="status"><p>{authStatusError || 'Loading your account…'}</p>{authStatusError && <button onClick={() => window.location.reload()}>Reload to retry account connection</button>}</section>;
+  if (session && !isCloudSyncEnabled(import.meta.env.VITE_CLOUD_SYNC_ENABLED)) return <LocalSession key={`local:${session.user.id}`} session={session}>{children}</LocalSession>;
   return session ? <CloudSession key={`user:${session.user.id}`} session={session}>{children}</CloudSession> : <GuestSession key="guest">{children}</GuestSession>;
 }
 export function useAccountStorage() {

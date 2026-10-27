@@ -51,6 +51,9 @@ jobs:
       - name: Rendered browser integration with mocked auth
         if: ${{ !cancelled() }}
         run: npm run test:browser
+      - name: Rendered default-off local account integration
+        if: ${{ !cancelled() }}
+        run: npm run test:local-browser
 
   database:
     runs-on: ubuntu-latest

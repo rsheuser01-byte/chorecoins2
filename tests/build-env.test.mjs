@@ -16,7 +16,8 @@ test('Vite config explicitly includes public settings and excludes synthetic pri
   vm.createContext(context); vm.runInContext(source, context);
   const config = context.configFactory({ mode: 'production' });
   assert.equal(config.envPrefix.length, 0);
-  assert.deepEqual(Object.keys(config.define).sort(), ['import.meta.env.VITE_PLAID_MOCK_MODE', 'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY', 'import.meta.env.VITE_SUPABASE_URL']);
+  assert.deepEqual(Object.keys(config.define).sort(), ['import.meta.env.VITE_CLOUD_SYNC_ENABLED', 'import.meta.env.VITE_PLAID_MOCK_MODE', 'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY', 'import.meta.env.VITE_SUPABASE_URL']);
+  assert.equal(JSON.parse(config.define['import.meta.env.VITE_CLOUD_SYNC_ENABLED']), 'false');
   assert.ok(!JSON.stringify(config).includes('PRIVATE_'));
   assert.equal(JSON.parse(config.define['import.meta.env.VITE_SUPABASE_URL']), synthetic.VITE_SUPABASE_URL);
 });
