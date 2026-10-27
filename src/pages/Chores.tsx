@@ -28,7 +28,7 @@ interface Chore extends Omit<BaseChore, 'reward'> {
 const DEFAULT_WEEKLY_ALLOWANCE = 20; // $20 per week
 
 // Enhanced chore categories with fun themes (weekly allowance system)
-const choreCategories = {
+const choreCategories: Record<string, { icon: typeof Home; color: string; chores: ChoreTemplate[] }> = {
   '🏠 Home': {
     icon: Home,
     color: 'from-blue-500 to-cyan-500',
@@ -216,7 +216,9 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         const parsed = JSON.parse(saved) as Record<string, ChoreTemplate[]>;
         return typeof parsed === 'object' && parsed !== null ? parsed : {};
       }
-    } catch (_) {}
+    } catch (_) {
+      // Preserve malformed stored data; use empty templates for this render.
+    }
     return {};
   });
 

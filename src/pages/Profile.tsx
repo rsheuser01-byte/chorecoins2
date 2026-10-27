@@ -27,7 +27,7 @@ const Profile = () => {
   const safeLocalStorage = useAccountStorage();
   const { user, isAuthenticated } = useAuth();
   const { userStats, achievements, recentNotifications, getUnlockedAchievements } = useGamification();
-  const { bankAccounts, depositSchedules, addBankAccount, createDepositSchedule } = usePlaid();
+  const { bankAccounts, depositSchedules, addBankAccount, createDepositSchedule, userBalance, syncBankBalance, isLoading: plaidLoading } = usePlaid();
   const { theme, toggleTheme, colors, setColors, resetColors } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTab, setSelectedTab] = useState(() => {
