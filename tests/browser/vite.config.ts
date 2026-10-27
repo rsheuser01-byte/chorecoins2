@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: { alias: [
     { find: '@/integrations/supabase/client', replacement: `${root}tests/browser/supabase-mock.ts` },
+    { find: '@/services/accountProgressApi', replacement: `${root}tests/browser/supabase-mock.ts` },
     { find: '@', replacement: `${root}src` },
   ] },
   server: { host: '127.0.0.1', port: 4179, strictPort: true },

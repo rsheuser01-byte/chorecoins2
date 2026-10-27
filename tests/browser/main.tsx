@@ -36,6 +36,19 @@ async function until(check: () => boolean, message: string) {
   const deadline = performance.now() + 5000;
   while (!check()) { if (performance.now() > deadline) throw new Error(message); await delay(); }
 }
+function button(label: string) {
+  return [...document.querySelectorAll('button')].find(item => item.textContent?.trim() === label);
+}
+async function accountReady() {
+  await until(() => !!button('Start fresh') || !!document.getElementById('progress'), 'Account hydration or legacy choice did not finish');
+  if (button('Start fresh')) button('Start fresh')!.click();
+  await until(() => !!document.getElementById('progress'), 'Account consumer did not mount after explicit choice');
+}
+async function clickButton(label: string) {
+  await until(() => !!button(label) && !button(label)!.disabled, `Missing or disabled ${label} action`);
+  button(label)!.click();
+  await delay();
+}
 async function record(name: string, run: () => Promise<void>) { await run(); result.passed.push(name); }
 function input(id: string, value: string) {
   const element = document.getElementById(id) as HTMLInputElement;
@@ -66,23 +79,28 @@ async function main() {
   await record('two accounts, logout/login and delayed old callbacks remain isolated', async () => {
     await auth.login('account-a@example.invalid', 'synthetic');
     await until(() => auth.user?.id === 'account-a', 'Account A not signed in');
+    await accountReady();
     setValue('A-CHORES');
     await until(() => storage.getItem('chores') === 'A-CHORES', 'A chores not saved');
+    await until(() => mock.snapshot('account-a').data.chores === 'A-CHORES', 'A chores did not reach cloud');
     const oldStorage = storage;
     assert((await auth.logout()).success, 'A logout failed');
     await until(() => auth.user === null, 'Logout did not clear auth');
     assert(document.getElementById('progress')!.textContent === 'EMPTY', 'Guest sees account A');
     await auth.login('account-b@example.invalid', 'synthetic');
     await until(() => auth.user?.id === 'account-b', 'Account B not signed in');
+    await accountReady();
     assert(document.getElementById('progress')!.textContent === 'EMPTY', 'B sees A data');
     setValue('B-CHORES');
     await until(() => storage.getItem('chores') === 'B-CHORES', 'B chores not saved');
+    await until(() => mock.snapshot('account-b').data.chores === 'B-CHORES', 'B chores did not reach cloud');
     oldStorage.setItem('chores', 'A-DELAYED');
     assert(storage.getItem('chores') === 'B-CHORES', 'Old callback wrote into B');
     await auth.logout(); await until(() => auth.user === null, 'B logout failed');
     await auth.login('account-a@example.invalid', 'synthetic');
     await until(() => auth.user?.id === 'account-a', 'A relogin failed');
-    assert(document.getElementById('progress')!.textContent === 'A-DELAYED', 'A data did not survive relogin');
+    await accountReady();
+    assert(document.getElementById('progress')!.textContent === 'A-CHORES', 'A data did not survive relogin or disposed callback mutated it');
   });
   await record('legacy data stays unassigned and backup notice is rendered', async () => {
     assert(localStorage.getItem('chores') === 'LEGACY-UNASSIGNED', 'Legacy chores changed');
@@ -96,7 +114,7 @@ async function main() {
     assert(!response.success && !!response.error, 'Signout error was hidden');
     await delay();
     assert(auth.user?.id === 'account-a', 'Failed signout falsely cleared auth');
-    assert(document.getElementById('progress')!.textContent === 'A-DELAYED', 'Failed signout changed progress');
+    assert(document.getElementById('progress')!.textContent === 'A-CHORES', 'Failed signout changed progress');
     mock.signOutError = false;
     await auth.logout(); await until(() => auth.user === null, 'Signout did not recover');
   });
@@ -123,6 +141,7 @@ async function main() {
   await record('ordinary session cannot reset password; recovery event can, errors recover', async () => {
     await auth.login('account-a@example.invalid', 'synthetic');
     await until(() => auth.user?.id === 'account-a', 'Reset test login failed');
+    await accountReady();
     setMode('reset'); await until(() => !!document.getElementById('confirmPassword'), 'Reset form missing');
     assert((document.getElementById('password') as HTMLInputElement).disabled, 'Ordinary session can reset through recovery screen');
     mock.emit('PASSWORD_RECOVERY', 'account-a');
@@ -134,6 +153,38 @@ async function main() {
     mock.updateError = false; await submit();
     await until(() => document.body.textContent!.includes('Your password has been updated'), 'Reset retry failed');
     assert(!auth.isPasswordRecovery && mock.updates === 2, 'Recovery state not consumed or duplicate updates');
+  });
+  setMode('closed'); await delay();
+  await record('cloud refresh renders edits from another device without overwriting them', async () => {
+    await until(() => mock.snapshot('account-a').data.chores === 'A-CHORES', 'Cloud baseline not ready');
+    mock.remoteEdit('account-a', { ...mock.snapshot('account-a').data, chores: 'OTHER-DEVICE-CHORES' });
+    await clickButton('Refresh cloud data');
+    await until(() => document.getElementById('progress')?.textContent === 'OTHER-DEVICE-CHORES', 'Refresh did not render remote progress');
+    await delay();
+    assert(mock.snapshot('account-a').data.chores === 'OTHER-DEVICE-CHORES', 'Stale component state overwrote remote progress');
+    assert(mock.snapshot('account-b').data.chores === 'B-CHORES', 'Refresh crossed account ownership');
+  });
+  await record('offline edits survive, concurrent cloud edits require explicit resolution', async () => {
+    mock.rpcOffline = true;
+    setValue('OFFLINE-LOCAL-CHORES');
+    await until(() => document.body.textContent!.includes('Cloud progress: offline.'), 'Offline status missing after RPC failure');
+    assert(mock.snapshot('account-a').data.chores === 'OTHER-DEVICE-CHORES', 'Offline edit unexpectedly reached cloud');
+    assert(storage.getItem('chores') === 'OFFLINE-LOCAL-CHORES', 'Offline local edits lost');
+    const journal = localStorage.getItem('chorecoins:sync:v1:user:account-a');
+    assert(journal?.includes('OFFLINE-LOCAL-CHORES'), 'Offline edit not durably journaled');
+    mock.remoteEdit('account-a', { ...mock.snapshot('account-a').data, chores: 'CONCURRENT-CLOUD-CHORES' });
+    mock.rpcOffline = false;
+    await clickButton('Refresh cloud data');
+    await until(() => !!button('Use cloud version'), 'Conflict did not require a decision');
+    assert(!document.getElementById('progress'), 'Editable consumers mounted during conflict');
+    assert(mock.snapshot('account-a').data.chores === 'CONCURRENT-CLOUD-CHORES', 'Conflict silently overwrote cloud');
+    const originalConfirm = window.confirm;
+    let confirmationAsked = false;
+    window.confirm = () => { confirmationAsked = true; return true; };
+    try { await clickButton('Use cloud version'); } finally { window.confirm = originalConfirm; }
+    assert(confirmationAsked, 'Cloud choice skipped confirmation');
+    await until(() => document.getElementById('progress')?.textContent === 'CONCURRENT-CLOUD-CHORES', 'Explicit cloud choice did not hydrate');
+    assert(localStorage.getItem('chores') === 'LEGACY-UNASSIGNED', 'Conflict resolution changed legacy data');
   });
   root.unmount();
 }

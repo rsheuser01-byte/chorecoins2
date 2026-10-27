@@ -1,3 +1,5 @@
+import { useAccountState } from '@/hooks/useAccountState';
+import { applyChoreReward } from '@/lib/choreRewards';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
 import { useAccountStorage } from '@/contexts/AccountDataContext';
@@ -26,6 +28,7 @@ export interface Achievement {
 }
 
 export interface UserStats {
+  rewardedChoreOccurrences?: string[];
   level: number;
   xp: number;
   xpToNextLevel: number;
@@ -44,7 +47,7 @@ export const useGamification = () => {
   const safeLocalStorage = useAccountStorage();
   const { playCoin, playSuccess, playLevelUp, playAchievement } = useSoundEffects();
   
-  const [userStats, setUserStats] = useState<UserStats>(() => {
+  const [userStats, setUserStats] = useAccountState<UserStats>('userStats', () => {
     const saved = safeLocalStorage.getItem('userStats');
     if (saved) {
       try {
@@ -107,7 +110,7 @@ export const useGamification = () => {
     };
   });
 
-  const [achievements, setAchievements] = useState<Achievement[]>(() => {
+  const [achievements, setAchievements] = useAccountState<Achievement[]>('achievements', () => {
     const saved = safeLocalStorage.getItem('achievements');
     return saved ? JSON.parse(saved) : [
       // 🏠 CHORES ACHIEVEMENTS
@@ -581,50 +584,35 @@ export const useGamification = () => {
     }));
   };
 
-  const completeChore = (reward: number) => {
-    // Play coin sound for reward
+  const completeChore = (reward: number, occurrenceId: string) => {
+    // Read the shared account store, not a potentially stale hook render. Commit the
+    // occurrence and its simulated reward together before any effects can run.
+    const saved = safeLocalStorage.getItem('userStats');
+    const current: UserStats = saved ? { ...userStats, ...JSON.parse(saved) } : userStats;
+    const next = applyChoreReward(current, occurrenceId, reward, new Date().toDateString());
+    if (next === current) return;
+    next.choreStreak = calculateStreak(next.completedChoreDays);
+    safeLocalStorage.setItem('userStats', JSON.stringify(next));
+    setUserStats(next);
     playCoin();
-    
-    setUserStats(prev => {
-      const today = new Date().toDateString();
-      const newCompletedDays = prev.completedChoreDays.includes(today) 
-        ? prev.completedChoreDays 
-        : [...prev.completedChoreDays, today];
-      
-      const newChoreStreak = calculateStreak(newCompletedDays);
-      
-      const newStats = {
-        ...prev,
-        totalChoresCompleted: prev.totalChoresCompleted + 1,
-        totalMoneyEarned: prev.totalMoneyEarned + reward,
-        choreStreak: newChoreStreak,
-        completedChoreDays: newCompletedDays,
-        lastActiveDate: today
-      };
-      
-      // Check achievements
-      checkAchievement('first_chore', newStats.totalChoresCompleted);
-      checkAchievement('chores_10', newStats.totalChoresCompleted);
-      checkAchievement('chores_50', newStats.totalChoresCompleted);
-      checkAchievement('chores_100', newStats.totalChoresCompleted);
-      checkAchievement('chore_streak_3', newStats.choreStreak);
-      checkAchievement('chore_streak_7', newStats.choreStreak);
-      checkAchievement('earn_100', newStats.totalMoneyEarned);
-      
-      // Check time-based achievements
-      const currentHour = new Date().getHours();
-      if (currentHour < 8) {
-        checkAchievement('early_bird', 1);
-      } else if (currentHour >= 20) {
-        checkAchievement('night_owl', 1);
-      }
-      
-      return newStats;
-    });
-    
-    // Play success sound and add XP
     playSuccess();
-    addXP(20, 'Chore Complete');
+    addNotification('+20 XP from Chore Complete!', 'xp');
+    if (next.level > current.level) {
+      addNotification(`🎉 Level Up! You're now level ${next.level}!`, 'level');
+      checkAchievement('level_5', next.level, true);
+      checkAchievement('level_10', next.level, true);
+      checkAchievement('level_20', next.level, true);
+    }
+    checkAchievement('first_chore', next.totalChoresCompleted);
+    checkAchievement('chores_10', next.totalChoresCompleted);
+    checkAchievement('chores_50', next.totalChoresCompleted);
+    checkAchievement('chores_100', next.totalChoresCompleted);
+    checkAchievement('chore_streak_3', next.choreStreak);
+    checkAchievement('chore_streak_7', next.choreStreak);
+    checkAchievement('earn_100', next.totalMoneyEarned);
+    const hour = new Date().getHours();
+    if (hour < 8) checkAchievement('early_bird', 1);
+    else if (hour >= 20) checkAchievement('night_owl', 1);
   };
 
   const completeLesson = (earnings: number) => {

@@ -89,7 +89,7 @@ try {
   }
   for (const name of outcome.passed) console.log(`PASS ${name}`);
   if (outcome.error) throw new Error(outcome.error);
-  if (outcome.passed.length !== 7) throw new Error(`Expected 7 integration tests; got ${outcome.passed.length}`);
+  if (outcome.passed.length !== 9) throw new Error(`Expected 9 integration tests; got ${outcome.passed.length}`);
   console.log(`Browser integration: ${outcome.passed.length} passed (mock auth; no live service requests).`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : String(error));

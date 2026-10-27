@@ -1,3 +1,4 @@
+import { choreOccurrenceId } from '@/lib/choreRewards';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -194,7 +195,7 @@ export default function ChoresEnhanced() {
   };
 
   const handleChoreComplete = (chore: Chore) => {
-    completeChore(0);
+    completeChore(0, choreOccurrenceId(chore));
   };
 
   // Calculate weekly progress
@@ -417,7 +418,7 @@ export default function ChoresEnhanced() {
                                     setChores(updatedChores);
                                     
                                     if (!chore.completed) {
-                                      completeChore(0);
+                                      completeChore(0, choreOccurrenceId(chore));
                                     } else {
                                       uncompleteChore();
                                     }

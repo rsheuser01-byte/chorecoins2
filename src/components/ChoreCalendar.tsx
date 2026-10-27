@@ -24,6 +24,8 @@ import calendarNovember from '@/assets/calendar-november.svg';
 import calendarDecember from '@/assets/calendar-december.svg';
 
 export interface Chore {
+  seriesId?: string;
+  occurrenceDate?: string;
   id: string;
   title: string;
   description?: string;
@@ -144,7 +146,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
       // (if an instance exists, we show that instead via the one-time check above)
       if (!recurringMatchesDate(chore, date)) return false;
       const hasInstanceForDate = chores.some(
-        c => (c.recurring === 'none' || !c.recurring) && c.title === chore.title && isSameDay(c.dueDate, date)
+        c => (c.recurring === 'none' || !c.recurring) && c.seriesId === chore.id && isSameDay(c.dueDate, date)
       );
       return !hasInstanceForDate;
     });
@@ -215,7 +217,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
     if (chore.recurring && chore.recurring !== 'none') {
       const existingInstance = chores.find(c =>
         (c.recurring === 'none' || !c.recurring) &&
-        c.title === chore.title &&
+        c.seriesId === chore.id &&
         isSameDay(c.dueDate, selectedDate)
       );
 
@@ -232,7 +234,9 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
       // No instance for this date: create one (user is marking this day complete)
       const instance: Chore = {
         ...chore,
-        id: Date.now().toString(),
+        id: `occurrence:${chore.id}:${format(selectedDate, 'yyyy-MM-dd')}`,
+        seriesId: chore.id,
+        occurrenceDate: format(selectedDate, 'yyyy-MM-dd'),
         dueDate: new Date(selectedDate),
         completed: true,
         recurring: 'none',

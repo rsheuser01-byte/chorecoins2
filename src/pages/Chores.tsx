@@ -1,3 +1,4 @@
+import { choreOccurrenceId } from '@/lib/choreRewards';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -394,7 +395,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       // Show completion animation (for both Today tab and Calendar tab)
       setChoreAnimation({ show: true, title: chore.title });
       // Award chore completion (handles XP and achievements internally)
-      completeChore(0);
+      completeChore(0, choreOccurrenceId(chore));
     } catch (error) {
       console.error('Error completing chore:', error);
     }
