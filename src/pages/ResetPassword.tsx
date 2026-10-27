@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertTriangle, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { canResetPassword } from '@/lib/authFlows';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ResetPassword = () => {
   const [password, setPassword] = useState('');
@@ -13,20 +15,12 @@ const ResetPassword = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [hasSession, setHasSession] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    if (!supabase) {
-      setHasSession(false);
-      return;
-    }
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setHasSession(!!session);
-    });
-  }, []);
+  const { session, isLoading: authLoading, completePasswordRecovery, isPasswordRecovery } = useAuth();
+  const hasSession = authLoading ? null : canResetPassword(!!session, isPasswordRecovery, window.location.hash);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isLoading || !hasSession) return;
 
     if (!password || !confirmPassword) {
       setError('Please enter and confirm your new password');
@@ -51,14 +45,21 @@ const ResetPassword = () => {
     setIsLoading(true);
     setError(null);
 
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setError(updateError.message);
-    } else {
-      setSuccess(true);
+    try {
+      const { error: updateError } = await supabase.auth.updateUser({ password });
+      if (updateError) {
+        setError(updateError.message);
+      } else {
+        setSuccess(true);
+        setPassword('');
+        setConfirmPassword('');
+        completePasswordRecovery();
+      }
+    } catch {
+      setError('Unable to update your password. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -69,7 +70,7 @@ const ResetPassword = () => {
           <CardDescription>Set a new password for your account.</CardDescription>
         </CardHeader>
         <CardContent>
-          {hasSession === false && (
+          {!success && hasSession === false && (
             <Alert variant="destructive" className="mb-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>
@@ -102,7 +103,7 @@ const ResetPassword = () => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
-                  disabled={isLoading || hasSession === false}
+                  disabled={isLoading || hasSession !== true}
                 />
               </div>
 
@@ -114,14 +115,14 @@ const ResetPassword = () => {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   autoComplete="new-password"
-                  disabled={isLoading || hasSession === false}
+                  disabled={isLoading || hasSession !== true}
                 />
               </div>
 
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading || hasSession === false}
+                disabled={isLoading || hasSession !== true}
               >
                 {isLoading ? (
                   <>
@@ -141,3 +142,4 @@ const ResetPassword = () => {
 };
 
 export default ResetPassword;
+

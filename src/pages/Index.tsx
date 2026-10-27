@@ -6,9 +6,10 @@ import { CallToAction } from '@/components/CallToAction';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
 import { WelcomeModal } from '@/components/WelcomeModal';
 import { useAuth } from '@/contexts/AuthContext';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 const Index = () => {
+  const safeLocalStorage = useAccountStorage();
   const { isAuthenticated, isLoading } = useAuth();
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
@@ -72,3 +73,4 @@ const Index = () => {
 };
 
 export default Index;
+

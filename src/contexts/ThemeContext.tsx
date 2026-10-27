@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 type Theme = 'light' | 'dark';
 
@@ -41,6 +41,7 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
+  const safeLocalStorage = useAccountStorage();
   const [theme, setThemeState] = useState<Theme>(() => {
     // Check localStorage first
     const savedTheme = safeLocalStorage.getItem('theme') as Theme | null;

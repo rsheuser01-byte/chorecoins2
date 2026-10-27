@@ -1,6 +1,10 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { normalizeStats } from '@/lib/progressStats';
+import { applyLessonProgress, applyXP } from '@/lib/learningProgress';
+import { useAccountState } from '@/hooks/useAccountState';
+import { applyChoreReward } from '@/lib/choreRewards';
+import { useState, useMemo, useCallback } from 'react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export interface Achievement {
   id: string;
@@ -26,6 +30,7 @@ export interface Achievement {
 }
 
 export interface UserStats {
+  rewardedChoreOccurrences?: string[];
   level: number;
   xp: number;
   xpToNextLevel: number;
@@ -40,75 +45,20 @@ export interface UserStats {
   completedLearningDays: string[]; // Track which days learning was completed
 }
 
+function decodeAchievements(raw: string): Achievement[] {
+  const parsed = JSON.parse(raw);
+  if (!Array.isArray(parsed) || parsed.some(item => !item || typeof item !== 'object' || typeof item.id !== 'string' || typeof item.unlocked !== 'boolean' || !item.reward || !Number.isFinite(item.reward.xp) || !Number.isFinite(item.reward.coins))) throw new Error('Invalid achievements');
+  return parsed;
+}
+
 export const useGamification = () => {
+  const safeLocalStorage = useAccountStorage();
   const { playCoin, playSuccess, playLevelUp, playAchievement } = useSoundEffects();
   
-  const [userStats, setUserStats] = useState<UserStats>(() => {
-    const saved = safeLocalStorage.getItem('userStats');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Migrate to ensure new fields exist with safe defaults
-        const defaults = {
-          level: 1,
-          xp: 0,
-          xpToNextLevel: 100,
-          totalXp: 0,
-          choreStreak: 0,
-          learningStreak: 0,
-          totalChoresCompleted: 0,
-          totalLessonsCompleted: 0,
-          totalMoneyEarned: 0,
-          lastActiveDate: new Date().toDateString(),
-          completedChoreDays: [],
-          completedLearningDays: []
-        };
-        
-        return {
-          ...defaults,
-          ...parsed,
-          // Ensure arrays exist and are arrays
-          completedChoreDays: Array.isArray(parsed.completedChoreDays) ? parsed.completedChoreDays : defaults.completedChoreDays,
-          completedLearningDays: Array.isArray(parsed.completedLearningDays) ? parsed.completedLearningDays : defaults.completedLearningDays,
-          lastActiveDate: typeof parsed.lastActiveDate === 'string' && parsed.lastActiveDate ? parsed.lastActiveDate : defaults.lastActiveDate
-        } as UserStats;
-      } catch {
-        // Fallback to defaults if parsing fails
-        return {
-          level: 1,
-          xp: 0,
-          xpToNextLevel: 100,
-          totalXp: 0,
-          choreStreak: 0,
-          learningStreak: 0,
-          totalChoresCompleted: 0,
-          totalLessonsCompleted: 0,
-          totalMoneyEarned: 0,
-          lastActiveDate: new Date().toDateString(),
-          completedChoreDays: [],
-          completedLearningDays: []
-        };
-      }
-    }
-    return {
-      level: 1,
-      xp: 0,
-      xpToNextLevel: 100,
-      totalXp: 0,
-      choreStreak: 0,
-      learningStreak: 0,
-      totalChoresCompleted: 0,
-      totalLessonsCompleted: 0,
-      totalMoneyEarned: 0,
-      lastActiveDate: new Date().toDateString(),
-      completedChoreDays: [],
-      completedLearningDays: []
-    };
-  });
+  const [userStats, setUserStats] = useAccountState<UserStats>('userStats', () => normalizeStats('{}'), normalizeStats);
 
-  const [achievements, setAchievements] = useState<Achievement[]>(() => {
-    const saved = safeLocalStorage.getItem('achievements');
-    return saved ? JSON.parse(saved) : [
+  const [achievements, setAchievements] = useAccountState<Achievement[]>('achievements', () => {
+    return [
       // 🏠 CHORES ACHIEVEMENTS
       { 
         id: 'first_chore', 
@@ -418,7 +368,7 @@ export const useGamification = () => {
         celebration: { animation: 'owl', message: 'Who-who! You\'re a night owl! 🦉' }
       },
     ];
-  });
+  }, decodeAchievements);
 
   const [recentNotifications, setRecentNotifications] = useState<Array<{
     id: string;
@@ -427,65 +377,21 @@ export const useGamification = () => {
     timestamp: Date;
   }>>([]);
 
-  // Debounced localStorage updates to prevent excessive writes during rapid state changes
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      safeLocalStorage.setItem('userStats', JSON.stringify(userStats));
-    }, 100);
-    return () => clearTimeout(timeoutId);
-  }, [userStats]);
-
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      safeLocalStorage.setItem('achievements', JSON.stringify(achievements));
-    }, 100);
-    return () => clearTimeout(timeoutId);
-  }, [achievements]);
+  const currentStats = (): UserStats => {
+    const saved = safeLocalStorage.getItem('userStats');
+    try { return saved ? normalizeStats(saved) : userStats; } catch { return userStats; }
+  };
 
   const addXP = (amount: number, source: string) => {
-    console.log(`[Gamification] Adding ${amount} XP from ${source}`);
-    setUserStats(prev => {
-      console.log(`[Gamification] Current stats:`, { level: prev.level, xp: prev.xp, xpToNext: prev.xpToNextLevel });
-      const newXp = prev.xp + amount;
-      const newTotalXp = prev.totalXp + amount;
-      let newLevel = prev.level;
-      let newXpToNextLevel = prev.xpToNextLevel;
-
-      // Check for level up
-      if (newXp >= prev.xpToNextLevel) {
-        newLevel++;
-        newXpToNextLevel = newLevel * 100; // Each level requires 100 more XP
-        const remainingXp = newXp - prev.xpToNextLevel;
-        
-        console.log(`[Gamification] LEVEL UP! New level: ${newLevel}, remaining XP: ${remainingXp}`);
-        
-        // Add level up notification
-        addNotification(`🎉 Level Up! You're now level ${newLevel}!`, 'level');
-        
-        // Check level achievements but skip rewards to prevent recursion
-        checkAchievement('level_5', newLevel, true);
-        checkAchievement('level_10', newLevel, true);
-        checkAchievement('level_20', newLevel, true);
-        
-        return {
-          ...prev,
-          level: newLevel,
-          xp: remainingXp,
-          xpToNextLevel: newXpToNextLevel,
-          totalXp: newTotalXp
-        };
-      }
-
-      // Add XP notification
-      addNotification(`+${amount} XP from ${source}!`, 'xp');
-
-      console.log(`[Gamification] Updated stats:`, { level: prev.level, xp: newXp, totalXp: newTotalXp });
-      return {
-        ...prev,
-        xp: newXp,
-        totalXp: newTotalXp
-      };
-    });
+    const previous = currentStats();
+    const next = applyXP(previous, amount);
+    setUserStats(next);
+    if (next.level > previous.level) {
+      addNotification(`🎉 Level Up! You're now level ${next.level}!`, 'level');
+      checkAchievement('level_5', next.level, true);
+      checkAchievement('level_10', next.level, true);
+      checkAchievement('level_20', next.level, true);
+    } else addNotification(`+${amount} XP from ${source}!`, 'xp');
   };
 
   const addNotification = (message: string, type: 'xp' | 'achievement' | 'level' | 'streak') => {
@@ -534,132 +440,69 @@ export const useGamification = () => {
   };
 
   const checkAchievement = (achievementId: string, progress: number, skipRewards: boolean = false) => {
-    setAchievements(prev => prev.map(achievement => {
-      if (achievement.id === achievementId && !achievement.unlocked) {
-        const updatedAchievement = { ...achievement, currentProgress: progress };
-        
-        if (progress >= achievement.requirement) {
-          updatedAchievement.unlocked = true;
-          updatedAchievement.unlockedAt = new Date();
-          
-          // Enhanced achievement notification with celebration
-          const celebrationMessage = achievement.celebration?.message || `🏆 Achievement Unlocked: ${achievement.title}!`;
-          playAchievement(); // Play achievement unlock sound
-          addNotification(celebrationMessage, 'achievement');
-          
-          // Award achievement rewards only if not skipping rewards (prevents recursion)
-          if (!skipRewards && achievement.reward) {
-            if (achievement.reward.xp) {
-              // Add XP without triggering more achievement checks
-              setUserStats(prevStats => ({
-                ...prevStats,
-                xp: prevStats.xp + achievement.reward.xp,
-                totalXp: prevStats.totalXp + achievement.reward.xp
-              }));
-              addNotification(`+${achievement.reward.xp} XP from Achievement!`, 'xp');
-            }
-            
-            // Add coins to user stats
-            if (achievement.reward.coins) {
-              setUserStats(prevStats => ({
-                ...prevStats,
-                totalMoneyEarned: prevStats.totalMoneyEarned + achievement.reward.coins
-              }));
-            }
-            
-            // Special reward handling
-            if (achievement.reward.special) {
-              addNotification(`🎁 Special Reward: ${achievement.reward.special}!`, 'achievement');
-            }
-          }
-        }
-        
-        return updatedAchievement;
-      }
-      return achievement;
-    }));
+    const saved = safeLocalStorage.getItem('achievements');
+    let current = achievements;
+    try { if (saved) current = decodeAchievements(saved); } catch { /* use validated defaults */ }
+    const achievement = current.find(item => item.id === achievementId && !item.unlocked);
+    if (!achievement) return;
+    const unlocked = progress >= achievement.requirement;
+    const updated = { ...achievement, currentProgress: progress, unlocked,
+      ...(unlocked ? { unlockedAt: new Date() } : {}) };
+    // Persist the unlock before rewarding it, and never perform cross-state writes
+    // inside an updater whose eventual return would overwrite those writes.
+    setAchievements(current.map(item => item.id === achievementId ? updated : item));
+    if (!unlocked) return;
+    playAchievement();
+    addNotification(achievement.celebration?.message || `🏆 Achievement Unlocked: ${achievement.title}!`, 'achievement');
+    if (!skipRewards && achievement.reward) {
+      const { xp, coins, special } = achievement.reward;
+      setUserStats(previous => ({ ...previous, xp: previous.xp + (xp || 0),
+        totalXp: previous.totalXp + (xp || 0), totalMoneyEarned: previous.totalMoneyEarned + (coins || 0) }));
+      if (xp) addNotification(`+${xp} XP from Achievement!`, 'xp');
+      if (special) addNotification(`🎁 Special Reward: ${special}!`, 'achievement');
+    }
   };
 
-  const completeChore = (reward: number) => {
-    // Play coin sound for reward
+  const completeChore = (reward: number, occurrenceId: string) => {
+    // Read the shared account store, not a potentially stale hook render. Commit the
+    // occurrence and its simulated reward together before any effects can run.
+    const current = currentStats();
+    const next = applyChoreReward(current, occurrenceId, reward, new Date().toDateString());
+    if (next === current) return;
+    next.choreStreak = calculateStreak(next.completedChoreDays);
+    safeLocalStorage.setItem('userStats', JSON.stringify(next));
+    setUserStats(next);
     playCoin();
-    
-    setUserStats(prev => {
-      const today = new Date().toDateString();
-      const newCompletedDays = prev.completedChoreDays.includes(today) 
-        ? prev.completedChoreDays 
-        : [...prev.completedChoreDays, today];
-      
-      const newChoreStreak = calculateStreak(newCompletedDays);
-      
-      const newStats = {
-        ...prev,
-        totalChoresCompleted: prev.totalChoresCompleted + 1,
-        totalMoneyEarned: prev.totalMoneyEarned + reward,
-        choreStreak: newChoreStreak,
-        completedChoreDays: newCompletedDays,
-        lastActiveDate: today
-      };
-      
-      // Check achievements
-      checkAchievement('first_chore', newStats.totalChoresCompleted);
-      checkAchievement('chores_10', newStats.totalChoresCompleted);
-      checkAchievement('chores_50', newStats.totalChoresCompleted);
-      checkAchievement('chores_100', newStats.totalChoresCompleted);
-      checkAchievement('chore_streak_3', newStats.choreStreak);
-      checkAchievement('chore_streak_7', newStats.choreStreak);
-      checkAchievement('earn_100', newStats.totalMoneyEarned);
-      
-      // Check time-based achievements
-      const currentHour = new Date().getHours();
-      if (currentHour < 8) {
-        checkAchievement('early_bird', 1);
-      } else if (currentHour >= 20) {
-        checkAchievement('night_owl', 1);
-      }
-      
-      return newStats;
-    });
-    
-    // Play success sound and add XP
     playSuccess();
-    addXP(20, 'Chore Complete');
+    addNotification('+20 XP from Chore Complete!', 'xp');
+    if (next.level > current.level) {
+      addNotification(`🎉 Level Up! You're now level ${next.level}!`, 'level');
+      checkAchievement('level_5', next.level, true);
+      checkAchievement('level_10', next.level, true);
+      checkAchievement('level_20', next.level, true);
+    }
+    checkAchievement('first_chore', next.totalChoresCompleted);
+    checkAchievement('chores_10', next.totalChoresCompleted);
+    checkAchievement('chores_50', next.totalChoresCompleted);
+    checkAchievement('chores_100', next.totalChoresCompleted);
+    checkAchievement('chore_streak_3', next.choreStreak);
+    checkAchievement('chore_streak_7', next.choreStreak);
+    checkAchievement('earn_100', next.totalMoneyEarned);
+    const hour = new Date().getHours();
+    if (hour < 8) checkAchievement('early_bird', 1);
+    else if (hour >= 20) checkAchievement('night_owl', 1);
   };
 
   const completeLesson = (earnings: number) => {
-    // Play success sound for lesson completion
+    const next = applyLessonProgress(currentStats(), earnings, new Date().toDateString());
+    next.learningStreak = calculateStreak(next.completedLearningDays);
+    setUserStats(next);
     playSuccess();
-    setUserStats(prev => {
-      const today = new Date().toDateString();
-      const newCompletedDays = prev.completedLearningDays.includes(today) 
-        ? prev.completedLearningDays 
-        : [...prev.completedLearningDays, today];
-      
-      const newLearningStreak = calculateStreak(newCompletedDays);
-      
-      const newStats = {
-        ...prev,
-        totalLessonsCompleted: prev.totalLessonsCompleted + 1,
-        totalMoneyEarned: prev.totalMoneyEarned + earnings,
-        learningStreak: newLearningStreak,
-        completedLearningDays: newCompletedDays,
-        lastActiveDate: today
-      };
-      
-      // Check achievements
-      checkAchievement('first_lesson', newStats.totalLessonsCompleted);
-      checkAchievement('lessons_5', newStats.totalLessonsCompleted);
-      checkAchievement('learning_streak_5', newStats.learningStreak);
-      checkAchievement('earn_100', newStats.totalMoneyEarned);
-      
-      // Check if this is a perfect day (chores + learning)
-      if (newStats.choreStreak > 0 && newStats.learningStreak > 0) {
-        checkAchievement('perfect_day', 1);
-      }
-      
-      return newStats;
-    });
-    
+    checkAchievement('first_lesson', next.totalLessonsCompleted);
+    checkAchievement('lessons_5', next.totalLessonsCompleted);
+    checkAchievement('learning_streak_5', next.learningStreak);
+    checkAchievement('earn_100', next.totalMoneyEarned);
+    if (next.choreStreak > 0 && next.learningStreak > 0) checkAchievement('perfect_day', 1);
     addXP(30, 'Lesson Complete');
   };
 

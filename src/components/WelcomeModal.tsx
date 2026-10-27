@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { LoginModal } from './LoginModal';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -26,6 +26,7 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
   onClose, 
   onContinueAsGuest 
 }) => {
+  const safeLocalStorage = useAccountStorage();
   const { isAuthenticated } = useAuth();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(false);
@@ -173,4 +174,5 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({
     </>
   );
 };
+
 

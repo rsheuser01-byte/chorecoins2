@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export interface Stock {
   symbol: string;
@@ -11,6 +11,7 @@ export interface Stock {
 }
 
 export const useMarketData = () => {
+  const safeLocalStorage = useAccountStorage();
   const [stocks, setStocks] = useState<Stock[]>(() => {
     const saved = safeLocalStorage.getItem('marketStocks');
     return saved ? JSON.parse(saved) : [

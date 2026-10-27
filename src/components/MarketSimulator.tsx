@@ -22,9 +22,10 @@ import { StockTradingCard } from './StockTradingCard';
 import { IllustratedStatCard } from './IllustratedStatCard';
 import { AnimatedList } from './AnimatedList';
 import { ParticleEffect } from './ParticleEffect';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export const MarketSimulator = () => {
+  const safeLocalStorage = useAccountStorage();
   const { stocks, marketCash, buyStock, sellStock, portfolioValue, totalPortfolioValue, portfolioChange } = useMarketData();
   const { 
     isConnected: coinbaseConnected, 

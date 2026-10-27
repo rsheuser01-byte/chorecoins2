@@ -1,3 +1,4 @@
+import { choreOccurrenceId } from '@/lib/choreRewards';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, T
 import { useGamification } from '@/hooks/useGamification';
 import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalendar';
 import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -104,10 +105,11 @@ const weekDays = [
 ];
 
 export default function ChoresEnhanced() {
+  const safeLocalStorage = useAccountStorage();
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // State management
-  const [chores, setChores] = useState<Chore[]>(() => {
+  const [chores, setChoresState] = useState<Chore[]>(() => {
     const saved = safeLocalStorage.getItem('chores');
     return saved ? JSON.parse(saved).map((chore: any) => ({
       ...chore,
@@ -141,10 +143,11 @@ export default function ChoresEnhanced() {
       : [...days, dayValue].sort();
   };
 
-  // Save chores to localStorage
-  useEffect(() => {
-    safeLocalStorage.setItem('chores', JSON.stringify(chores));
-  }, [chores]);
+  // Persist synchronously so completion + stats share the caller's transaction.
+  const setChores = (next: Chore[]) => {
+    safeLocalStorage.setItem('chores', JSON.stringify(next));
+    setChoresState(next);
+  };
 
   // Load weekly allowance from localStorage
   useEffect(() => {
@@ -193,7 +196,7 @@ export default function ChoresEnhanced() {
   };
 
   const handleChoreComplete = (chore: Chore) => {
-    completeChore(0);
+    completeChore(0, choreOccurrenceId(chore));
   };
 
   // Calculate weekly progress
@@ -410,17 +413,17 @@ export default function ChoresEnhanced() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
+                                  onClick={() => safeLocalStorage.transaction(() => {
                                     const updatedChore = { ...chore, completed: !chore.completed };
                                     const updatedChores = chores.map(c => c.id === chore.id ? updatedChore : c);
                                     setChores(updatedChores);
                                     
                                     if (!chore.completed) {
-                                      completeChore(0);
+                                      completeChore(0, choreOccurrenceId(chore));
                                     } else {
                                       uncompleteChore();
                                     }
-                                  }}
+                                  })}
                                   className={`p-0 h-8 w-8 rounded-full transition-all duration-300 ${
                                     chore.completed 
                                       ? 'bg-money-green text-white scale-110 shadow-lg' 

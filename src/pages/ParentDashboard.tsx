@@ -11,10 +11,11 @@ import {
 } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
 import { format, startOfWeek, endOfWeek, isToday, subDays, eachDayOfInterval } from 'date-fns';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export const ParentDashboard = () => {
-  const { userStats } = useGamification();
+  const safeLocalStorage = useAccountStorage();
+  const { userStats, achievements } = useGamification();
   const [selectedChild, setSelectedChild] = useState('nova'); // In real app, would be from auth
   
   // Get chores from localStorage (in real app, from API)
@@ -298,7 +299,7 @@ export const ParentDashboard = () => {
                 </div>
                 <div className="p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
                   <p className="text-sm text-muted-foreground">Achievements Unlocked</p>
-                  <p className="text-2xl font-bold">{userStats.achievements?.length || 0}</p>
+                  <p className="text-2xl font-bold">{achievements.filter(achievement => achievement.unlocked).length}</p>
                 </div>
               </CardContent>
             </Card>
@@ -308,4 +309,5 @@ export const ParentDashboard = () => {
     </div>
   );
 };
+
 

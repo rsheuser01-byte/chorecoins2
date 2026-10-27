@@ -8,8 +8,8 @@ const getMemoryValue = (key: string) => {
 };
 
 const canUseLocalStorage = () => {
-  if (typeof window === "undefined" || !window.localStorage) return false;
   try {
+    if (typeof window === "undefined" || !window.localStorage) return false;
     const testKey = "__storage_test__";
     window.localStorage.setItem(testKey, "1");
     window.localStorage.removeItem(testKey);
@@ -55,3 +55,4 @@ export const safeLocalStorage: StorageLike = {
     memoryStore.delete(key);
   }
 };
+

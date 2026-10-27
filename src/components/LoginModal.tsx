@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,9 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [needsEmailConfirmation, setNeedsEmailConfirmation] = useState(false);
+  const requestVersion = useRef(0);
+  const pending = useRef(false);
   const [isResetMode, setIsResetMode] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
 
@@ -37,6 +40,11 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
 
   // Reset to default mode when modal opens
   useEffect(() => {
+    requestVersion.current += 1;
+    pending.current = false;
+    setIsLoading(false);
+    setPassword('');
+    setNeedsEmailConfirmation(false);
     if (isOpen) {
       setIsSignup(defaultMode === 'signup');
       setError(null);
@@ -44,10 +52,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
       setIsResetMode(false);
       setResetSuccess(false);
     }
+    return () => { requestVersion.current += 1; };
   }, [isOpen, defaultMode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current) return;
     
     if (!email.trim() || !password.trim()) {
       setError('Please enter both email and password');
@@ -59,11 +69,13 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
       return;
     }
 
-    if (password.length < 6) {
+    if (isSignup && password.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
 
+    pending.current = true;
+    const version = requestVersion.current;
     setIsLoading(true);
     setError(null);
 
@@ -72,26 +84,27 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
         ? await signup(email.trim(), password)
         : await login(email.trim(), password);
       
+      if (version !== requestVersion.current) return;
       if (result.success) {
+        setNeedsEmailConfirmation('needsEmailConfirmation' in result && !!result.needsEmailConfirmation);
         setSuccess(true);
-        setTimeout(() => {
-          onClose();
-          setSuccess(false);
-          setEmail('');
-          setPassword('');
-        }, 1500);
+        setPassword('');
       } else {
         setError(result.error || 'Authentication failed. Please try again.');
       }
     } catch (error) {
-      setError('An error occurred. Please try again.');
+      if (version === requestVersion.current) setError('An error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) {
+        pending.current = false;
+        setIsLoading(false);
+      }
     }
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current) return;
 
     if (!email.trim()) {
       setError('Please enter your email');
@@ -103,20 +116,26 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
       return;
     }
 
+    pending.current = true;
+    const version = requestVersion.current;
     setIsLoading(true);
     setError(null);
 
     try {
       const result = await resetPassword(email.trim());
+      if (version !== requestVersion.current) return;
       if (result.success) {
         setResetSuccess(true);
       } else {
         setError(result.error || 'Unable to send reset email.');
       }
     } catch (error) {
-      setError('An error occurred. Please try again.');
+      if (version === requestVersion.current) setError('An error occurred. Please try again.');
     } finally {
-      setIsLoading(false);
+      if (version === requestVersion.current) {
+        pending.current = false;
+        setIsLoading(false);
+      }
     }
   };
 
@@ -153,11 +172,14 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
               <CheckCircle className="h-16 w-16 text-green-500 animate-bounce" />
             </div>
             <h3 className="text-xl font-semibold text-green-600 mb-2">
-              Welcome back!
+              {needsEmailConfirmation ? 'Check your email' : 'You’re signed in!'}
             </h3>
             <p className="text-muted-foreground">
-              You're all set to start earning coins and completing chores!
+              {needsEmailConfirmation
+                ? 'If this address is eligible, a confirmation email is on its way. Follow the link before signing in. Check your spam folder too.'
+                : 'You can now continue to your account.'}
             </p>
+            <Button className="mt-4" onClick={handleClose}>Done</Button>
           </div>
         ) : isResetMode ? (
           <form onSubmit={handleResetPassword} className="space-y-4">
@@ -172,7 +194,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
               <div className="text-center py-4">
                 <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground">
-                  Password reset email sent. Check your inbox.
+                  If an account exists for this address, check your inbox for a password reset email.
                 </p>
               </div>
             ) : (
@@ -265,7 +287,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10"
                   disabled={isLoading}
-                  autoComplete="current-password"
+                  autoComplete={isSignup ? "new-password" : "current-password"}
                 />
               </div>
             </div>
@@ -324,3 +346,4 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, default
     </Dialog>
   );
 };
+

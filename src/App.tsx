@@ -1,14 +1,16 @@
+import { AccountRouteGate } from '@/components/AccountRouteGate';
 import { useEffect } from "react";
+import { shouldRouteToRecovery } from "@/lib/authFlows";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NotificationWidget } from "@/components/GamificationWidget";
 import { SoundToggle } from "@/components/SoundToggle";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Index from "./pages/Index";
 import Chores from "./pages/Chores";
@@ -25,22 +27,6 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
-
-const AuthHashRedirect = () => {
-  const location = useLocation();
-
-  useEffect(() => {
-    const hash = window.location.hash || "";
-    const hasAccessToken = hash.includes("access_token");
-
-    if (hasAccessToken && location.pathname !== "/reset-password") {
-      const newUrl = `/reset-password${hash}`;
-      window.history.replaceState({}, document.title, newUrl);
-    }
-  }, [location.pathname]);
-
-  return null;
-};
 
 // Component to handle route changes and prevent sounds
 const RouteChangeHandler = () => {
@@ -150,7 +136,6 @@ const ScrollLockGuard = () => {
 const AppContent = () => (
   <div className="min-h-screen bg-background overflow-x-hidden">
     <ScrollLockGuard />
-    <AuthHashRedirect />
     <RouteChangeHandler />
     <Header />
     <Routes>
@@ -173,19 +158,21 @@ const AppContent = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <AuthProvider>
-          <Toaster />
-          <Sonner />
-          <NotificationWidget />
-          <SoundToggle />
-          <BrowserRouter>
+    <TooltipProvider>
+      <AuthProvider>
+        <BrowserRouter>
+        <AccountRouteGate>
+          <ThemeProvider>
+            <Toaster />
+            <Sonner />
+            <NotificationWidget />
+            <SoundToggle />
             <AppContent />
-          </BrowserRouter>
-        </AuthProvider>
-      </TooltipProvider>
-    </ThemeProvider>
+          </ThemeProvider>
+        </AccountRouteGate>
+        </BrowserRouter>
+      </AuthProvider>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

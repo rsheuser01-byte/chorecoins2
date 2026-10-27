@@ -16,9 +16,10 @@ import {
   EyeOff
 } from 'lucide-react';
 import { useDatabase } from '@/hooks/useDatabase';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export const DatabaseConfig = () => {
+  const safeLocalStorage = useAccountStorage();
   const { initialize, isConnected, error } = useDatabase();
   const [connectionString, setConnectionString] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -263,3 +264,4 @@ export const DatabaseConfig = () => {
     </Card>
   );
 };
+

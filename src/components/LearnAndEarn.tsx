@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, CheckCircle, PlayCircle, DollarSign, Zap, Star, Trophy, Sparkles } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 interface Lesson {
   id: string;
@@ -20,6 +20,7 @@ interface Lesson {
 }
 
 export const LearnAndEarn = () => {
+  const safeLocalStorage = useAccountStorage();
   const { completeLesson, correctQuizAnswer, userStats } = useGamification();
   
   const handleCompleteLesson = (lesson: Lesson, earnedAmount: number) => {

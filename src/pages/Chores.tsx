@@ -1,3 +1,4 @@
+import { choreOccurrenceId } from '@/lib/choreRewards';
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +16,7 @@ import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalend
 import { ChoreCompletionAnimation } from '@/components/ChoreCompletionAnimation';
 import { format, isToday, isSameDay, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -28,7 +29,7 @@ interface Chore extends Omit<BaseChore, 'reward'> {
 const DEFAULT_WEEKLY_ALLOWANCE = 20; // $20 per week
 
 // Enhanced chore categories with fun themes (weekly allowance system)
-const choreCategories = {
+const choreCategories: Record<string, { icon: typeof Home; color: string; chores: ChoreTemplate[] }> = {
   '🏠 Home': {
     icon: Home,
     color: 'from-blue-500 to-cyan-500',
@@ -118,6 +119,7 @@ const CUSTOM_CHORE_TEMPLATES_KEY = 'customChoreTemplates';
 type ChoreTemplate = { title: string; description: string; difficulty: 'easy' | 'medium' | 'hard'; emoji: string };
 
 export default function Chores() {
+  const safeLocalStorage = useAccountStorage();
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // Convert old format chores to new format
@@ -215,7 +217,9 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
         const parsed = JSON.parse(saved) as Record<string, ChoreTemplate[]>;
         return typeof parsed === 'object' && parsed !== null ? parsed : {};
       }
-    } catch (_) {}
+    } catch (_) {
+      // Preserve malformed stored data; use empty templates for this render.
+    }
     return {};
   });
 
@@ -387,17 +391,12 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   };
 
   const handleChoreComplete = (chore: Chore) => {
-    try {
-      // Show completion animation (for both Today tab and Calendar tab)
-      setChoreAnimation({ show: true, title: chore.title });
-      // Award chore completion (handles XP and achievements internally)
-      completeChore(0);
-    } catch (error) {
-      console.error('Error completing chore:', error);
-    }
+    // Called inside the Today/calendar transaction; let failures roll back all writes.
+    completeChore(0, choreOccurrenceId(chore));
+    setChoreAnimation({ show: true, title: chore.title });
   };
 
-  const toggleChore = (choreId: string) => {
+  const toggleChore = (choreId: string) => safeLocalStorage.transaction(() => {
     const chore = choreData.find(c => c.id === choreId);
     if (!chore) return;
     
@@ -418,7 +417,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       // Unmarking as complete - decrement streak
       uncompleteChore();
     }
-  };
+  });
 
   const todayChores = choreData.filter(chore => isToday(chore.dueDate));
   const completedChores = todayChores.filter(chore => chore.completed).length;
