@@ -1,0 +1,50 @@
+name: Validate account and auth changes
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      VITE_SUPABASE_URL: https://example.invalid
+      VITE_SUPABASE_PUBLISHABLE_KEY: synthetic-public-test-key
+      VITE_PLAID_MOCK_MODE: 'true'
+      VITE_NEON_DATABASE_URL: PRIVATE_DB_SENTINEL_NOT_A_CREDENTIAL
+      PLAID_SECRET: PRIVATE_PLAID_SENTINEL_NOT_A_CREDENTIAL
+      VERCEL_ARTIFACTS_TOKEN: PRIVATE_ARTIFACT_SENTINEL_NOT_A_CREDENTIAL
+      VERCEL_ENV_ENC_KEY: PRIVATE_ENV_SENTINEL_NOT_A_CREDENTIAL
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Exclude committed environment files from test build
+        # Do not read or print their contents. This only affects the ephemeral checkout.
+        run: |
+          node --input-type=module <<'JS'
+          import { readdirSync, unlinkSync } from 'node:fs';
+          for (const name of readdirSync('.')) {
+            if ((name === '.env' || name.startsWith('.env.')) && name !== '.env.example') unlinkSync(name);
+          }
+          JS
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:focused
+      - run: npm run lint
+      - name: Type check
+        if: ${{ !cancelled() }}
+        run: npm run typecheck
+      - name: Build with synthetic public settings
+        if: ${{ !cancelled() }}
+        run: npm run build
+      - name: Scan generated assets for private sentinel leakage
+        if: ${{ !cancelled() }}
+        run: npm run check:bundle

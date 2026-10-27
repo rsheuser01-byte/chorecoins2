@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { SavingsGoal } from '@/components/SavingsGoals';
 import type { SpendingTransaction } from '@/components/SpendingTracker';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export interface PortfolioItem {
   id: string;
@@ -15,6 +15,7 @@ export interface PortfolioItem {
 }
 
 export const usePortfolio = () => {
+  const safeLocalStorage = useAccountStorage();
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>(() => {
     try {
       const saved = safeLocalStorage.getItem('portfolio');

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSoundEffects } from '@/hooks/useSoundEffects';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export interface Achievement {
   id: string;
@@ -41,6 +41,7 @@ export interface UserStats {
 }
 
 export const useGamification = () => {
+  const safeLocalStorage = useAccountStorage();
   const { playCoin, playSuccess, playLevelUp, playAchievement } = useSoundEffects();
   
   const [userStats, setUserStats] = useState<UserStats>(() => {

@@ -21,9 +21,10 @@ import { ColorPicker } from '@/components/ColorPicker';
 import { WeeklySummary } from '@/components/WeeklySummary';
 import { AnalyticsDashboard } from '@/components/AnalyticsDashboard';
 import { useSearchParams } from 'react-router-dom';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 const Profile = () => {
+  const safeLocalStorage = useAccountStorage();
   const { user, isAuthenticated } = useAuth();
   const { userStats, achievements, recentNotifications, getUnlockedAchievements } = useGamification();
   const { bankAccounts, depositSchedules, addBankAccount, createDepositSchedule } = usePlaid();

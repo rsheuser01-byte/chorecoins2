@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { signupOutcome } from '@/lib/authFlows';
 import { supabase } from '@/integrations/supabase/client';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 
@@ -14,10 +15,12 @@ interface AuthContextType {
   session: Session | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isPasswordRecovery: boolean;
+  completePasswordRecovery: () => void;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  signup: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (email: string, password: string) => Promise<{ success: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => Promise<void>;
+  logout: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -30,6 +33,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  // Only the SDK's verified recovery event authorizes password reset. A URL hash
+  // alone can be expired, invalid, or supplied while another account is signed in.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   // Set up auth state listener and check for existing session
   useEffect(() => {
@@ -38,9 +44,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return;
     }
 
+    let active = true;
+    let authEventReceived = false;
+
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        if (!active) return;
+        authEventReceived = true;
+        if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
+        if (event === 'SIGNED_OUT' || event === 'SIGNED_IN') setIsPasswordRecovery(false);
+        setIsLoading(false);
         setSession(session);
         setUser(session?.user ? {
           id: session.user.id,
@@ -52,6 +66,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!active || authEventReceived) return;
       setSession(session);
       setUser(session?.user ? {
         id: session.user.id,
@@ -60,10 +75,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       } : null);
       setIsLoading(false);
     }).catch(() => {
+      if (!active) return;
       setIsLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signup = async (email: string, password: string) => {
@@ -71,7 +90,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       return { success: false, error: 'Authentication is not configured' };
     }
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -79,11 +98,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { success: true };
+      return signupOutcome(data.session, error);
     } catch (error) {
       return { success: false, error: 'An unexpected error occurred' };
     }
@@ -129,11 +144,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+    try {
+      if (supabase) {
+        const { error } = await supabase.auth.signOut();
+        if (error) return { success: false, error: error.message };
+      }
+      setUser(null);
+      setSession(null);
+      setIsPasswordRecovery(false);
+      return { success: true };
+    } catch {
+      return { success: false, error: 'Unable to sign out. Please try again.' };
     }
-    setUser(null);
-    setSession(null);
   };
 
   const value: AuthContextType = {
@@ -141,6 +163,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     isAuthenticated: !!user,
     isLoading,
+    isPasswordRecovery,
+    completePasswordRecovery: () => setIsPasswordRecovery(false),
     login,
     signup,
     resetPassword,
@@ -161,3 +185,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

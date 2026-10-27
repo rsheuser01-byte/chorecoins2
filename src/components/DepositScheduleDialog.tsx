@@ -29,8 +29,7 @@ export const DepositScheduleDialog: React.FC<DepositScheduleDialogProps> = ({
   });
 
   // Check if we're in mock mode
-  const isMockMode = process.env.REACT_APP_PLAID_CLIENT_ID === 'your_plaid_client_id' || 
-                    !process.env.REACT_APP_PLAID_CLIENT_ID;
+  const isMockMode = import.meta.env.VITE_PLAID_MOCK_MODE !== 'false';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -268,3 +267,4 @@ export const DepositScheduleDialog: React.FC<DepositScheduleDialogProps> = ({
     </Dialog>
   );
 };
+

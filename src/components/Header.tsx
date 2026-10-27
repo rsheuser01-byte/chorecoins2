@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -28,9 +29,17 @@ export const Header = () => {
     { href: '/parent', label: 'Parent', icon: Users },
   ];
 
-  const handleLogout = () => {
+  const logoutPending = useRef(false);
+  const handleLogout = async () => {
+    if (logoutPending.current) return;
+    logoutPending.current = true;
     playClick();
-    logout();
+    try {
+      const result = await logout();
+      if (!result.success) toast.error(result.error || 'Unable to sign out. Please try again.');
+    } finally {
+      logoutPending.current = false;
+    }
   };
 
   return (

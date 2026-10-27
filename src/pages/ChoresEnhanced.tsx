@@ -13,7 +13,7 @@ import { CheckCircle, Plus, Target, List, Calendar as CalendarIcon, Zap, Star, T
 import { useGamification } from '@/hooks/useGamification';
 import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalendar';
 import { format, isToday, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -104,6 +104,7 @@ const weekDays = [
 ];
 
 export default function ChoresEnhanced() {
+  const safeLocalStorage = useAccountStorage();
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // State management

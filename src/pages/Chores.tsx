@@ -15,7 +15,7 @@ import { ChoreCalendar, type Chore as BaseChore } from '@/components/ChoreCalend
 import { ChoreCompletionAnimation } from '@/components/ChoreCompletionAnimation';
 import { format, isToday, isSameDay, startOfWeek, endOfWeek, addDays } from 'date-fns';
 import { AnimatedMascot } from '@/components/AnimatedMascot';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 // Extended Chore interface for this component
 interface Chore extends Omit<BaseChore, 'reward'> {
@@ -118,6 +118,7 @@ const CUSTOM_CHORE_TEMPLATES_KEY = 'customChoreTemplates';
 type ChoreTemplate = { title: string; description: string; difficulty: 'easy' | 'medium' | 'hard'; emoji: string };
 
 export default function Chores() {
+  const safeLocalStorage = useAccountStorage();
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // Convert old format chores to new format

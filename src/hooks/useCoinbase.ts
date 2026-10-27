@@ -9,7 +9,7 @@ import {
   getCoinbaseAPI,
   POPULAR_PAIRS
 } from '@/services/coinbaseApi';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export interface CoinbaseCredentials {
   apiKey: string;
@@ -29,6 +29,7 @@ export interface CoinbaseState {
 }
 
 export const useCoinbase = () => {
+  const safeLocalStorage = useAccountStorage();
   const [state, setState] = useState<CoinbaseState>({
     isConnected: false,
     isLoading: false,
@@ -295,3 +296,4 @@ export const useCoinbase = () => {
     loadAccounts,
   };
 };
+

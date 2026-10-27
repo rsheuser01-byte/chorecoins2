@@ -1,14 +1,16 @@
+import { AccountDataBoundary } from '@/contexts/AccountDataContext';
 import { useEffect } from "react";
+import { shouldRouteToRecovery } from "@/lib/authFlows";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { NotificationWidget } from "@/components/GamificationWidget";
 import { SoundToggle } from "@/components/SoundToggle";
-import { AuthProvider } from "@/contexts/AuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import Index from "./pages/Index";
 import Chores from "./pages/Chores";
@@ -28,16 +30,15 @@ const queryClient = new QueryClient();
 
 const AuthHashRedirect = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { isPasswordRecovery } = useAuth();
 
   useEffect(() => {
-    const hash = window.location.hash || "";
-    const hasAccessToken = hash.includes("access_token");
-
-    if (hasAccessToken && location.pathname !== "/reset-password") {
-      const newUrl = `/reset-password${hash}`;
-      window.history.replaceState({}, document.title, newUrl);
+    // Confirmation and magic-link tokens are not password recovery links.
+    if (shouldRouteToRecovery(location.hash, location.pathname, isPasswordRecovery)) {
+      navigate(`/reset-password${location.hash}`, { replace: true });
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.hash, isPasswordRecovery, navigate]);
 
   return null;
 };
@@ -176,6 +177,7 @@ const App = () => (
     <ThemeProvider>
       <TooltipProvider>
         <AuthProvider>
+          <AccountDataBoundary>
           <Toaster />
           <Sonner />
           <NotificationWidget />
@@ -183,6 +185,7 @@ const App = () => (
           <BrowserRouter>
             <AppContent />
           </BrowserRouter>
+                  </AccountDataBoundary>
         </AuthProvider>
       </TooltipProvider>
     </ThemeProvider>
@@ -190,3 +193,4 @@ const App = () => (
 );
 
 export default App;
+

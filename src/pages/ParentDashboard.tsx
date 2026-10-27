@@ -11,9 +11,10 @@ import {
 } from 'lucide-react';
 import { useGamification } from '@/hooks/useGamification';
 import { format, startOfWeek, endOfWeek, isToday, subDays, eachDayOfInterval } from 'date-fns';
-import { safeLocalStorage } from '@/lib/safeLocalStorage';
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 
 export const ParentDashboard = () => {
+  const safeLocalStorage = useAccountStorage();
   const { userStats } = useGamification();
   const [selectedChild, setSelectedChild] = useState('nova'); // In real app, would be from auth
   
@@ -308,4 +309,5 @@ export const ParentDashboard = () => {
     </div>
   );
 };
+
 
