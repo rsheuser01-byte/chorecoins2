@@ -63,6 +63,7 @@ export function createLocalProgress(storage: StorageAdapter, userId: string) {
       else { const next = { ...data }; delete next[name]; persist(next); }
     },
     transaction(work: () => void) {
+      if (work.constructor.name === 'AsyncFunction') throw new Error('Local progress transactions must be synchronous');
       const outer = draft;
       draft = { ...(outer ?? data) };
       try {

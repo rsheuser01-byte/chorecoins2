@@ -31,3 +31,13 @@ test('successful nested transactions persist once and old-source changes block f
  const disk=memory(),a=createLocalProgress(disk,'A');a.transaction(()=>{a.setItem('cash','2');a.transaction(()=>a.setItem('chores','[]'));assert.equal(a.getItem('chores'),'[]');});assert.equal(disk.writes,1);assert.deepEqual(a.read(),{cash:'2',chores:'[]'});
  const next=memory(),b=createLocalProgress(next,'B');next.map.set('chorecoins:v1:user:B:cash','9');assert.throws(()=>b.setItem('cash','1'));assert.equal(next.getItem('chorecoins:local:v1:B'),null);assert.equal(next.getItem('chorecoins:v1:user:B:cash'),'9');
 });
+
+test('async transaction callback is rejected before invocation', () => {
+  const backing = new Map();
+  const storage = { getItem: key => backing.get(key) ?? null, setItem: (key, value) => backing.set(key, value), removeItem: key => backing.delete(key) };
+  const local = createLocalProgress(storage, 'synthetic');
+  let invoked = false;
+  assert.throws(() => local.transaction(async () => { invoked = true; await Promise.resolve(); local.setItem('weeklyAllowance', '9'); }));
+  assert.equal(invoked, false);
+  assert.equal(backing.size, 0);
+});

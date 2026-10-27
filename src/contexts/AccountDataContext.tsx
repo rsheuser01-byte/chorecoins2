@@ -32,6 +32,8 @@ function GuestSession({ children }: { children: ReactNode }) {
 }
 function LocalSession({ session, children }: { session: Session; children: ReactNode }) {
   const owner = session.user.id;
+  const { logout } = useAuth();
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const active = useRef(true);
   const depth = useRef(0);
   const [locked, setLocked] = useState(false);
@@ -68,6 +70,8 @@ function LocalSession({ session, children }: { session: Session; children: React
     <aside className="p-3 border-b bg-muted text-sm" role="status">
       Local-only progress: saved on this browser. Cloud syncing is not enabled. Signing in on another device will not copy these chores.
       {' '}<button className="underline" onClick={exportLocal}>Download account backup</button>
+      {' '}<button className="underline" onClick={() => { void logout().then(result => { if (!result.success) setLogoutError(result.error || 'Unable to sign out. Please retry.'); }); }}>Sign out</button>
+      {logoutError && <p role="alert">{logoutError}</p>}
       <p>Do not clear browser storage. Local account separation is not encryption or protection from someone using this browser.</p>
     </aside>
     {error || initialized.error ? <section role="alert">{error || initialized.error}</section> : locked ? children : <p role="status">Opening local account storage…</p>}
