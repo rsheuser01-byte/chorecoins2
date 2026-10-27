@@ -1,3 +1,10 @@
+## Activation is OFF by default
+`VITE_CLOUD_SYNC_ENABLED` is an explicit public build flag. Only exact `true` enables cloud progress. Missing/false/malformed values use account-scoped local-only progress, with a persistent UI warning and account/legacy exports. No progress RPC is constructed in that mode. This is not a runtime fallback: enabled cloud errors remain fail-closed and never switch to local-only mode.
+
+Do not enable the flag before the reviewed migration, stable backend, recoverable backup/restore verification and separate release approval. No live configuration was changed. Rebuilding with the flag enabled is feature activation. Once activated with real data, turning it back off forks local/cloud histories: do not use the flag as an automatic rollback. Preserve/export both and use an approved reconciliation plan. Local-only journals are offered as explicit owner-confirmed imports into EMPTY cloud accounts; existing cloud data is never auto-replaced.
+
+Missing public Supabase configuration leaves authentication unavailable; it does not enable cloud or silently identify a guest as another user. Password recovery stays outside progress hydration in either mode.
+
 # Per-account cloud progress — rollout gate
 
 ## Model and boundaries

@@ -6,6 +6,7 @@ export default defineConfig({
   root,
   envFile: false,
   envPrefix: [],
+  define: { 'import.meta.env.VITE_CLOUD_SYNC_ENABLED': JSON.stringify('true') },
   plugins: [react()],
   resolve: { alias: [
     { find: '@/integrations/supabase/client', replacement: `${root}tests/browser/supabase-mock.ts` },

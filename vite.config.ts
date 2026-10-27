@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
   define: {
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL || ''),
     'import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY': JSON.stringify(env.VITE_SUPABASE_PUBLISHABLE_KEY || ''),
+    'import.meta.env.VITE_CLOUD_SYNC_ENABLED': JSON.stringify(env.VITE_CLOUD_SYNC_ENABLED === 'true' ? 'true' : 'false'),
     'import.meta.env.VITE_PLAID_MOCK_MODE': JSON.stringify(env.VITE_PLAID_MOCK_MODE || 'true'),
   },
   build: {
