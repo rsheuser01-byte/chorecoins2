@@ -100,7 +100,7 @@ function CloudSession({ session, children }: { session: Session; children: React
   const [ownsLegacy, setOwnsLegacy] = useState(false);
   const local = useMemo(() => createAccountStorage(safeLocalStorage, userId), [userId]);
   const candidates = useMemo(() => {
-    let account;
+    let account: ReturnType<typeof previewLegacyImport>;
     try { account = previewLegacyImport(createLocalProgress(window.localStorage, userId)); }
     catch { account = { data: {}, invalid: ['Preserved local account journal needs manual review'], adjustments: [] }; }
     return { account, shared: previewLegacyImport(safeLocalStorage) };
