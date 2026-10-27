@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test:focused": "node --test tests/*.test.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
-    "check:bundle": "node scripts/check-bundle.mjs"
+    "check:bundle": "node scripts/check-bundle.mjs",
+    "test:browser": "node scripts/test-browser.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

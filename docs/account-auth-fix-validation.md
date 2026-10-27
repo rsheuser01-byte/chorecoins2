@@ -29,9 +29,14 @@ These are helper/config tests, not rendered React integration tests, real authen
 4. For cloud persistence, choose the authoritative Supabase project, inspect deployed schemas, implement owner IDs and RLS policies with authenticated CRUD and two-user denial tests. Preserve/export legacy data and obtain explicit ownership/import decisions before migration.
 5. Suspected committed or deployed credentials need owner-authorized rotation and history/artifact response. Removing environment serialization prevents future exposure but does not revoke already exposed values. This patch does not rotate credentials or remove history.
 
-No pushes, PRs, database writes, real account actions, deploys, credential changes, or environment/security-setting changes were performed.
+Initial local work made no remote changes. Following explicit user approval, draft PR #1 was published on the review branch. No merge, deployment, live database write, real account action, credential rotation, or account security-setting change was performed.
 
 ## Prepared CI (not published or run remotely)
 No `.github` paths existed in the pinned repository tree. `.github/workflows/validate.yml` adds pull-request/manual validation only, read-only repository permissions, no deployment and no repository secrets. It removes environment files from the ephemeral checkout without reading them, installs locked dependencies, runs focused tests/lint/typechecks/build, then scans generated assets for synthetic private sentinels and forbidden environment variable names. Actual build/typecheck may reveal pre-existing issues; none are represented as passing locally.
 
 The review branch `codex/account-auth-isolation-20261027` is explicitly excluded from automatic Vercel Git deployments in `vercel.json`; no production branch setting is changed. The branch must be created directly at the guarded commit, never at an unguarded intermediate commit. This is a Git-integration guard, not an authorization for any deployment.
+
+## GitHub CI result after approved publication
+Run 40435963600 for head `9a2950a42586af4b4681bbd1591b66f1fcef5c8e` passed dependency installation, all 13 focused tests, lint, app and Vite-config typechecks, production build with synthetic settings, and generated-asset sentinel scan. The first run exposed narrow existing lint/type defects in the touched pages; these were corrected rather than suppressing checks. Rendered browser integration coverage is being added separately.
+
+Rendered integration harness: `npm run test:browser` uses the locked Vite/React packages and system Chrome via CDP, a fresh browser profile, fully mocked Supabase, and blocks all non-local HTTP(S) requests. It covers loading before session restoration, two-account/logout/relogin rendering, captured old callbacks, retained legacy notice/data, signout failure, signup confirmation persistence and errors/reopen, and reset authorization/error/retry. Missing Chrome fails explicitly rather than skipping.
