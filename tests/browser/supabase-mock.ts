@@ -11,6 +11,7 @@ const receipts = new Map<string, Receipt>();
 const copy = <T,>(value: T): T => structuredClone(value);
 export const mock = {
   rpcOffline: false,
+  loseNextCommitAck: false,
   snapshot(userId: string): Snapshot { return copy(snapshots.get(userId) ?? { version: 0, data: {} }); },
   remoteEdit(userId: string, data: Record<string, string>) {
     const previous = this.snapshot(userId);
@@ -48,6 +49,10 @@ async function rpcFor(userId: string | undefined, name: string, args?: { expecte
     const next = { version: current.version + 1, data: copy(data) };
     snapshots.set(userId, next);
     receipts.set(receiptKey, { expected_version: args.expected_version, operation_version: next.version, data: copy(data) });
+    if (mock.loseNextCommitAck) {
+      mock.loseNextCommitAck = false; mock.rpcOffline = true;
+      return { data: null, error: { message: 'Synthetic lost commit acknowledgement' } };
+    }
     return { data: { ...copy(next), status: 'applied', operation_version: next.version }, error: null };
 }
 

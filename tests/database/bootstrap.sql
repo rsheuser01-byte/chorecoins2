@@ -12,4 +12,5 @@ GRANT EXECUTE ON FUNCTION auth.uid() TO anon, authenticated;
 INSERT INTO auth.users(id) VALUES
   ('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'),
   ('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'),
-  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc');
+  ('cccccccc-cccc-4ccc-8ccc-cccccccccccc'),
+  ('dddddddd-dddd-4ddd-8ddd-dddddddddddd');

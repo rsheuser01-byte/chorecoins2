@@ -137,3 +137,103 @@ test('stale same-account tab cannot overwrite a newer durable local queue', asyn
   await b.refresh(); await b.flush(); assert.equal(disk.getItem(a.journalKey), stored);
   await a.flush(); assert.equal(cloud.row('A').data.chores, 'tab-A-offline-draft');
 });
+
+
+test('multi-key transaction persists and emits exactly once with both chores and rewards', async () => {
+  const cloud = server(), disk = memory(); let writes = 0;
+  const a = make('A', cloud, { ...disk, setItem(key, value) { writes++; disk.setItem(key, value); } });
+  await a.initialize(); writes = 0; let notifications = 0; a.subscribe(() => notifications++);
+  const value = a.transaction(() => {
+    a.storage.setItem('chores', 'completed');
+    assert.equal(a.storage.getItem('chores'), 'completed');
+    assert.equal(a.getState().data.chores, undefined);
+    assert.equal(writes, 0); assert.equal(notifications, 0);
+    a.storage.setItem('userStats', 'rewarded');
+    return 'done';
+  });
+  assert.equal(value, 'done'); assert.equal(writes, 1); assert.equal(notifications, 1);
+  const journal = JSON.parse(disk.getItem(a.journalKey));
+  assert.deepEqual(journal.working, { chores: 'completed', userStats: 'rewarded' });
+  await a.flush(); assert.deepEqual(cloud.row('A').data, journal.working);
+});
+
+test('failed final transaction persistence rolls back all keys and exports attempted draft without an RPC', async () => {
+  const cloud = server(), disk = memory(); let failWrites = false;
+  const a = make('A', cloud, { ...disk, setItem(key, value) { if (failWrites) throw new Error('quota'); disk.setItem(key, value); } });
+  await a.initialize(); a.transaction(() => { a.storage.setItem('chores', 'before'); a.storage.setItem('userStats', 'before-reward'); }); await a.flush();
+  const saved = disk.getItem(a.journalKey); failWrites = true;
+  let caught;
+  try { a.transaction(() => { a.storage.setItem('chores', 'after'); a.storage.setItem('userStats', 'after-reward'); }); } catch (error) { caught = error; }
+  assert.equal(caught.message, 'quota'); assert.deepEqual(caught.unsavedProgress, { chores: 'after', userStats: 'after-reward' });
+  assert.equal(a.storage.getItem('chores'), 'before'); assert.equal(a.storage.getItem('userStats'), 'before-reward');
+  assert.equal(disk.getItem(a.journalKey), saved); assert.equal(a.getState().dirty, false);
+  await a.flush(); assert.equal(cloud.row('A').version, 1);
+});
+
+test('callback errors, async callbacks and Promise returns roll back staged progress', async () => {
+  const cloud = server(), a = make('A', cloud); await a.initialize();
+  assert.throws(() => a.transaction(() => { a.storage.setItem('chores', 'bad'); throw new Error('cancel'); }), /cancel/);
+  assert.equal(a.storage.getItem('chores'), null);
+  let invoked = false;
+  assert.throws(() => a.transaction(async () => { invoked = true; a.storage.setItem('chores', 'async'); }), /synchronous/);
+  assert.equal(invoked, false);
+  assert.throws(() => a.transaction(() => { a.storage.setItem('chores', 'promise'); return Promise.resolve(); }), /Promise/);
+  assert.equal(a.storage.getItem('chores'), null); assert.equal(a.getState().dirty, false);
+});
+
+test('nested transactions stage together and nested failure restores its previous draft', async () => {
+  const cloud = server(), a = make('A', cloud); await a.initialize();
+  a.transaction(() => {
+    a.storage.setItem('chores', 'outer');
+    assert.throws(() => a.transaction(() => { a.storage.removeItem('chores'); throw new Error('inner'); }), /inner/);
+    assert.equal(a.storage.getItem('chores'), 'outer');
+    a.transaction(() => { a.storage.setItem('userStats', 'inner-reward'); });
+  });
+  assert.equal(a.storage.getItem('chores'), 'outer'); assert.equal(a.storage.getItem('userStats'), 'inner-reward');
+});
+
+
+test('duplicate ACK adopting newer remote work increments remoteRevision; own ACK does not', async () => {
+  const cloud = server(), a = make('A', cloud); await a.initialize();
+  const initialRevision = a.getState().remoteRevision;
+  a.storage.setItem('chores', 'first'); cloud.loseResponse = true; await a.flush();
+  assert.equal(a.getState().remoteRevision, initialRevision);
+  const b = make('A', cloud); await b.initialize(); b.storage.setItem('chores', 'remote-newer'); await b.flush();
+  await a.flush();
+  assert.equal(a.storage.getItem('chores'), 'remote-newer');
+  assert.equal(a.getState().remoteRevision, initialRevision + 1);
+  a.storage.setItem('chores', 'own-next'); await a.flush();
+  assert.equal(a.getState().remoteRevision, initialRevision + 1);
+  b.storage.setItem('chores', 'another-local'); await b.flush();
+  await b.resolveConflict('server');
+  assert.equal(b.getState().remoteRevision, 1);
+  a.storage.setItem('chores', 'fresh-remote'); await a.flush();
+  await b.refresh(); assert.equal(b.getState().remoteRevision, 2);
+});
+
+
+test('injected payload validation blocks malformed cached inner JSON without replacing its journal', async () => {
+  const cloud = server(), disk = memory(), initial = make('A', cloud, disk); await initial.initialize();
+  const raw = JSON.parse(disk.getItem(initial.journalKey));
+  raw.working.portfolio = '{broken';
+  const corrupted = JSON.stringify(raw); disk.setItem(initial.journalKey, corrupted); initial.dispose();
+  const validateData = data => { if (data.portfolio !== undefined) { if (!Array.isArray(JSON.parse(data.portfolio))) throw new Error('Portfolio must be an array'); } return data; };
+  const a = createAccountSync({ userId: 'A', api: cloud.api('A'), persistence: disk, validateData });
+  await a.initialize(); assert.equal(a.getState().ready, false); assert.equal(a.getState().phase, 'error');
+  await a.refresh(); assert.equal(a.getState().ready, false); assert.equal(disk.getItem(a.journalKey), corrupted);
+});
+
+test('injected validator covers remote data, mutations, pending payloads and completed transactions', async () => {
+  const cloud = server(), disk = memory();
+  const validateData = data => { if (data.chores !== data.userStats) throw new Error('Coupled fields disagree'); return data; };
+  const a = createAccountSync({ userId: 'A', api: cloud.api('A'), persistence: disk, validateData }); await a.initialize();
+  assert.throws(() => a.storage.setItem('chores', 'new'), /disagree/);
+  a.transaction(() => { a.storage.setItem('chores', 'new'); a.transaction(() => a.storage.setItem('weeklyAllowance', '20')); a.storage.setItem('userStats', 'new'); });
+  assert.equal(a.storage.getItem('chores'), 'new'); await a.flush();
+  assert.throws(() => a.storage.removeItem('userStats'), /disagree/);
+  const raw = JSON.parse(disk.getItem(a.journalKey)); raw.pending = { expectedVersion: raw.base.version, operationId: 'bad-pending', data: { chores: 'wrong' } };
+  disk.setItem(a.journalKey, JSON.stringify(raw)); a.dispose();
+  const restored = createAccountSync({ userId: 'A', api: cloud.api('A'), persistence: disk, validateData }); await restored.initialize(); assert.equal(restored.getState().ready, false);
+  const remote = createAccountSync({ userId: 'B', api: { ...cloud.api('B'), getSnapshot: async () => ({ version: 1, data: { chores: 'wrong' } }) }, persistence: memory(), validateData });
+  await remote.initialize(); assert.equal(remote.getState().ready, false);
+});

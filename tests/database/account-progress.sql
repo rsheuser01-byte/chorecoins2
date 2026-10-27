@@ -112,6 +112,47 @@ BEGIN
   ASSERT ((public.read_account_progress()->'data'->>'userStats')::jsonb->>'totalChoresCompleted')::int = 1;
 END $$;
 
+DO $$
+DECLARE denied boolean := false;
+BEGIN
+  BEGIN
+    PERFORM public.commit_account_progress(2, 'aaaaaaaa-2222-4222-8222-222222222222',
+      (public.read_account_progress()->'data') || jsonb_build_object('importMetadata',
+        '{"version":1,"source":"legacy-shared","consentedAt":"2026-10-27T12:00:00.000Z","fields":["chores"]}'));
+  EXCEPTION WHEN invalid_parameter_value THEN denied := true;
+  END;
+  ASSERT denied, 'Import provenance added after initial cloud snapshot';
+END $$;
+
+SET request.jwt.claim.sub = 'dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+DO $$
+DECLARE r jsonb; denied boolean := false;
+  metadata jsonb := '{"version":1,"source":"legacy-shared","consentedAt":"2026-10-27T12:00:00.000Z","fields":["chores"]}';
+BEGIN
+  BEGIN
+    PERFORM public.commit_account_progress(0, '99999999-9999-4999-8999-999999999999',
+      jsonb_build_object('chores','[]','importMetadata',(metadata - 'source' || '{"extra":"bad"}'::jsonb)::text));
+  EXCEPTION WHEN invalid_parameter_value THEN denied := true;
+  END;
+  ASSERT denied, 'Missing provenance source accepted';
+  r := public.commit_account_progress(0, '99999999-9999-4999-8999-999999999999',
+    jsonb_build_object('chores','[]','importMetadata',metadata::text));
+  ASSERT r->>'status' = 'applied';
+  denied := false;
+  BEGIN
+    PERFORM public.commit_account_progress(1, 'aaaaaaaa-1111-4111-8111-111111111111',
+      jsonb_build_object('chores','[]','importMetadata',(metadata || '{"source":"legacy-account"}'::jsonb)::text));
+  EXCEPTION WHEN invalid_parameter_value THEN denied := true;
+  END;
+  ASSERT denied, 'Import provenance was modified';
+  denied := false;
+  BEGIN
+    PERFORM public.commit_account_progress(1, 'aaaaaaaa-1111-4111-8111-111111111111', '{"chores":"[]"}');
+  EXCEPTION WHEN invalid_parameter_value THEN denied := true;
+  END;
+  ASSERT denied, 'Import provenance was removed';
+END $$;
+
 SET request.jwt.claim.sub = '';
 DO $$
 DECLARE denied boolean := false;
@@ -137,7 +178,7 @@ END $$;
 RESET ROLE;
 DO $$ BEGIN
   ASSERT (SELECT data->>'chores' FROM public.account_progress WHERE user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 'A2', 'A data changed during B tests';
-  ASSERT (SELECT count(*) FROM chorecoins_private.account_progress_operations) = 4, 'Unexpected receipt count';
+  ASSERT (SELECT count(*) FROM chorecoins_private.account_progress_operations) = 5, 'Unexpected receipt count';
   ASSERT (SELECT bool_and(octet_length(payload_hash) = 32) FROM chorecoins_private.account_progress_operations), 'Receipt is not a SHA-256 digest';
   ASSERT NOT has_function_privilege('anon', 'public.commit_account_progress(bigint,uuid,jsonb)', 'EXECUTE');
   ASSERT NOT has_function_privilege('anon', 'chorecoins_private.commit_account_progress(bigint,uuid,jsonb)', 'EXECUTE');

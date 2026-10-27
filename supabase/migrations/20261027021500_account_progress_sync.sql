@@ -65,6 +65,7 @@ DECLARE
   v_payload_hash bytea;
   v_row public.account_progress%ROWTYPE;
   v_receipt chorecoins_private.account_progress_operations%ROWTYPE;
+  v_metadata jsonb;
   v_stats jsonb;
   v_old_stats jsonb;
   v_ledger jsonb;
@@ -76,7 +77,7 @@ DECLARE
     'chores', 'weeklyAllowance', 'customChoreTemplates', 'userStats', 'achievements',
     'profileData', 'portfolio', 'cash', 'savingsGoals', 'spendingTransactions',
     'marketStocks', 'marketCash', 'learnEarnLessons', 'learnEarnTotal',
-    'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors'
+    'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors', 'importMetadata'
   ];
 BEGIN
   IF v_user IS NULL THEN
@@ -120,6 +121,43 @@ BEGIN
 
   IF v_row.version <> v_expected THEN
     RETURN jsonb_build_object('status', 'conflict', 'version', v_row.version, 'data', v_row.data);
+  END IF;
+
+  -- One-time explicit import provenance, stored without account identifiers.
+  IF v_row.data ? 'importMetadata' THEN
+    IF NOT (v_data ? 'importMetadata') OR v_row.data->'importMetadata' <> v_data->'importMetadata' THEN
+      RAISE EXCEPTION 'Import provenance cannot be changed or removed' USING ERRCODE = '22023';
+    END IF;
+  ELSIF v_data ? 'importMetadata' THEN
+    IF v_expected <> 0 THEN
+      RAISE EXCEPTION 'Import provenance is allowed only for initial cloud import' USING ERRCODE = '22023';
+    END IF;
+    BEGIN
+      v_metadata := (v_data->>'importMetadata')::jsonb;
+    EXCEPTION WHEN invalid_text_representation THEN
+      RAISE EXCEPTION 'Invalid import provenance JSON' USING ERRCODE = '22023';
+    END;
+    IF jsonb_typeof(v_metadata) <> 'object' OR v_metadata->'version' IS DISTINCT FROM '1'::jsonb
+      OR (SELECT count(*) FROM jsonb_object_keys(v_metadata)) <> 4
+      OR jsonb_typeof(v_metadata->'source') IS DISTINCT FROM 'string'
+      OR v_metadata->>'source' NOT IN ('legacy-shared','legacy-account')
+      OR jsonb_typeof(v_metadata->'consentedAt') IS DISTINCT FROM 'string'
+      OR (v_metadata->>'consentedAt') !~ '^\d{4}-\d{2}-\d{2}T.+(Z|[+-]\d{2}:\d{2})$'
+      OR jsonb_typeof(v_metadata->'fields') IS DISTINCT FROM 'array' THEN
+      RAISE EXCEPTION 'Invalid import provenance fields' USING ERRCODE = '22023';
+    END IF;
+    BEGIN
+      PERFORM (v_metadata->>'consentedAt')::timestamptz;
+    EXCEPTION WHEN invalid_datetime_format OR datetime_field_overflow THEN
+      RAISE EXCEPTION 'Invalid import consent timestamp' USING ERRCODE = '22023';
+    END;
+    IF jsonb_array_length(v_metadata->'fields') = 0
+      OR EXISTS (SELECT 1 FROM jsonb_array_elements(v_metadata->'fields') AS f(value)
+        WHERE jsonb_typeof(f.value) <> 'string' OR NOT ((f.value #>> '{}') = ANY(v_allowed))
+          OR f.value #>> '{}' = 'importMetadata' OR NOT (v_data ? (f.value #>> '{}')))
+      OR (SELECT count(*) <> count(DISTINCT value) FROM jsonb_array_elements(v_metadata->'fields')) THEN
+      RAISE EXCEPTION 'Invalid imported field list' USING ERRCODE = '22023';
+    END IF;
   END IF;
 
   -- Completion IDs survive undo/re-complete and reject repeated count rewards

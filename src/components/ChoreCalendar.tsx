@@ -1,3 +1,4 @@
+import { useAccountStorage } from '@/contexts/AccountDataContext';
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
   onRequestAddChore,
   onRequestEditChore,
 }) => {
+  const accountStorage = useAccountStorage();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [isAddingChore, setIsAddingChore] = useState(false);
   const [newChore, setNewChore] = useState<Partial<Chore>>({
@@ -211,7 +213,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
     onChoreUpdate(updatedChores);
   };
 
-  const toggleChoreComplete = (chore: Chore) => {
+  const toggleChoreComplete = (chore: Chore) => accountStorage.transaction(() => {
     // Recurring chore: never toggle the template. Always use an instance for the selected date
     // so that completing on one day doesn't mark other days complete.
     if (chore.recurring && chore.recurring !== 'none') {
@@ -254,7 +256,7 @@ export const ChoreCalendar: React.FC<ChoreCalendarProps> = ({
     if (!chore.completed) {
       onChoreComplete(updatedChore);
     }
-  };
+  });
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {

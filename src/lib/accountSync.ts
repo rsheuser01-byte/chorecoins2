@@ -15,7 +15,7 @@ export const syncedProgressKeys = [
   'chores', 'weeklyAllowance', 'customChoreTemplates', 'userStats', 'achievements',
   'profileData', 'portfolio', 'cash', 'savingsGoals', 'spendingTransactions',
   'marketStocks', 'marketCash', 'learnEarnLessons', 'learnEarnTotal',
-  'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors',
+  'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors', 'importMetadata',
 ] as const;
 const allowed = new Set<string>(syncedProgressKeys);
 const MAX_BYTES = 1024 * 1024;
@@ -28,10 +28,6 @@ export function validateProgressData(value: unknown): ProgressData {
   }
   if (new TextEncoder().encode(JSON.stringify(result)).length > MAX_BYTES) throw new Error('Progress exceeds the 1 MiB sync limit');
   return result;
-}
-function snapshot(value: ProgressSnapshot): ProgressSnapshot {
-  if (!value || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error('Invalid progress version');
-  return { version: value.version, data: validateProgressData(value.data) };
 }
 function equal(a: ProgressData, b: ProgressData) {
   const keys = Object.keys(a);
@@ -50,19 +46,43 @@ export interface SyncState {
   syncing: boolean;
   dirty: boolean;
   version: number;
+  remoteRevision: number;
   data: Readonly<ProgressData>;
   error: string | null;
   conflict: null | { local: ProgressData; remote: ProgressSnapshot };
 }
+export type ProgressDataValidator = (data: ProgressData) => ProgressData;
 export interface AccountSyncOptions {
   userId: string;
   api: ProgressApi;
   persistence: SyncPersistence;
   operationId?: () => string;
+  validateData?: ProgressDataValidator;
 }
 
-export function createAccountSync({ userId, api, persistence, operationId = () => crypto.randomUUID() }: AccountSyncOptions) {
+export class ProgressTransactionError extends Error {
+  readonly unsavedProgress: ProgressData;
+  readonly originalError: unknown;
+  constructor(error: unknown, attempted: ProgressData) {
+    super(error instanceof Error ? error.message : 'Progress transaction failed');
+    this.name = 'ProgressTransactionError';
+    this.unsavedProgress = { ...attempted };
+    this.originalError = error;
+  }
+}
+
+export function createAccountSync({ userId, api, persistence, operationId = () => crypto.randomUUID(), validateData }: AccountSyncOptions) {
   if (!userId) throw new Error('An authenticated account ID is required');
+  function validatedData(value: unknown): ProgressData {
+    const data = validateProgressData(value);
+    // Structural/domain validation runs before any stored or remote payload reaches UI.
+    // Recheck the envelope in case an injected validator returns a transformed result.
+    return validateData ? validateProgressData(validateData(data)) : data;
+  }
+  function snapshot(value: ProgressSnapshot): ProgressSnapshot {
+    if (!value || !Number.isSafeInteger(value.version) || value.version < 0) throw new Error('Invalid progress version');
+    return { version: value.version, data: validatedData(value.data) };
+  }
   const journalKey = `chorecoins:sync:v1:user:${encodeURIComponent(userId)}`;
   let journal: Journal | null = null;
   let disposed = false;
@@ -70,9 +90,10 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
   let corruptJournal = false;
   let staleJournal = false;
   let journalRaw: string | null = null;
+  let transactionDraft: ProgressData | null = null;
   let serial: Promise<unknown> = Promise.resolve();
   const listeners = new Set<() => void>();
-  let state: SyncState = Object.freeze({ phase: 'loading', ready: false, syncing: false, dirty: false, version: 0, data: Object.freeze({}), error: null, conflict: null });
+  let state: SyncState = Object.freeze({ phase: 'loading', ready: false, syncing: false, dirty: false, version: 0, remoteRevision: 0, data: Object.freeze({}), error: null, conflict: null });
   function emit(overrides: Partial<SyncState> = {}) {
     if (disposed) return;
     state = Object.freeze({ ...state, ...(journal ? {
@@ -116,11 +137,11 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
     const value = JSON.parse(raw) as Journal;
     if (value.format !== 1 || value.userId !== userId) throw new Error('Stored sync journal has an invalid owner or format');
     const base = snapshot(value.base);
-    const working = validateProgressData(value.working);
+    const working = validatedData(value.working);
     let pending: CommitRequest | null = null;
     if (value.pending) {
       if (typeof value.pending.operationId !== 'string' || !value.pending.operationId || value.pending.expectedVersion !== base.version) throw new Error('Invalid pending sync operation');
-      pending = { expectedVersion: base.version, operationId: value.pending.operationId, data: validateProgressData(value.pending.data) };
+      pending = { expectedVersion: base.version, operationId: value.pending.operationId, data: validatedData(value.pending.data) };
     }
     journal = { format: 1, userId, base, working, pending };
   }
@@ -147,12 +168,14 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
       return;
     }
     if (remote.version === operationVersion && !equal(remote.data, request.data)) throw new Error('Cloud commit data did not match the operation');
+    const adoptedRemoteData = !laterEdits && !equal(journal!.working, remote.data);
     save({ ...journal!, base: remote, working: laterEdits ? journal!.working : { ...remote.data }, pending: null });
-    emit({ phase: 'ready', ready: true, syncing: false, error: null, conflict: null });
+    emit({ remoteRevision: state.remoteRevision + (adoptedRemoteData ? 1 : 0), phase: 'ready', ready: true, syncing: false, error: null, conflict: null });
   }
   async function loadRemote() {
     const remote = snapshot(await api.getSnapshot());
     if (disposed) return;
+    let adoptedRemoteData = false;
     if (!journal) {
       save({ format: 1, userId, base: remote, working: { ...remote.data }, pending: null });
     } else if (journal.pending) {
@@ -163,13 +186,41 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
     } else if (!equal(journal.working, journal.base.data)) {
       if (remote.version !== journal.base.version || !equal(remote.data, journal.base.data)) { conflict(remote); return; }
     } else {
+      adoptedRemoteData = !equal(journal.working, remote.data);
       save({ ...journal, base: remote, working: { ...remote.data }, pending: null });
     }
-    emit({ phase: 'ready', ready: true, syncing: false, error: null, conflict: null });
+    emit({ remoteRevision: state.remoteRevision + (adoptedRemoteData ? 1 : 0), phase: 'ready', ready: true, syncing: false, error: null, conflict: null });
+  }
+  function transaction<T>(fn: () => T): T {
+    if (disposed || !state.ready || !journal) throw new Error('Account progress is not ready for editing');
+    if (fn.constructor.name === 'AsyncFunction') throw new ProgressTransactionError(new Error('Progress transactions must be synchronous'), transactionDraft ?? journal.working);
+    const parentDraft = transactionDraft;
+    transactionDraft = { ...(parentDraft ?? journal.working) };
+    try {
+      const value = fn();
+      if (value && (typeof value === 'object' || typeof value === 'function') && 'then' in value && typeof value.then === 'function') {
+        throw new Error('Progress transactions must not return a Promise');
+      }
+      const working = parentDraft === null ? validatedData(transactionDraft) : validateProgressData(transactionDraft);
+      if (parentDraft !== null) {
+        transactionDraft = working;
+      } else {
+        // Do not publish partially staged chore/reward data if the durable write fails.
+        if (!equal(working, journal.working)) save({ ...journal, working });
+        transactionDraft = null;
+        emit();
+      }
+      return value;
+    } catch (error) {
+      const attempted = { ...(transactionDraft ?? journal.working) };
+      transactionDraft = parentDraft;
+      throw error instanceof ProgressTransactionError ? error : new ProgressTransactionError(error, attempted);
+    }
   }
   const getCurrentState = (): SyncState => state;
   const engine = {
     journalKey,
+    transaction,
     getState: getCurrentState,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     initialize: () => queue(async () => {
@@ -196,17 +247,19 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
     resolveConflict: (choice: 'server' | 'local') => queue(async () => {
       if (!journal || !state.conflict) throw new Error('No conflict to resolve');
       const remote = snapshot(state.conflict.remote);
+      const adoptedRemoteData = choice === 'server' && !equal(journal.working, remote.data);
       save({ ...journal, base: remote, working: choice === 'server' ? { ...remote.data } : { ...journal.working }, pending: null });
-      emit({ phase: 'ready', ready: true, error: null, conflict: null });
+      emit({ remoteRevision: state.remoteRevision + (adoptedRemoteData ? 1 : 0), phase: 'ready', ready: true, error: null, conflict: null });
       // Keeping local changes remains queued; explicit flush retries against this observed version.
     }),
     storage: {
-      getItem(key: string) { return allowed.has(key) ? state.data[key] ?? null : null; },
+      getItem(key: string) { return allowed.has(key) ? (transactionDraft ?? state.data)[key] ?? null : null; },
       setItem(key: string, value: string) {
         if (disposed) return;
         if (!state.ready || !journal) throw new Error('Account progress is not ready for editing');
         if (!allowed.has(key) || typeof value !== 'string') throw new Error('This key cannot be cloud synchronized');
-        const working = validateProgressData({ ...journal.working, [key]: value });
+        if (transactionDraft !== null) { transactionDraft[key] = value; return; }
+        const working = validatedData({ ...journal.working, [key]: value });
         if (equal(working, journal.working)) return;
         save({ ...journal, working }); emit();
       },
@@ -214,7 +267,9 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
         if (disposed) return;
         if (!state.ready || !journal) throw new Error('Account progress is not ready for editing');
         if (!allowed.has(key)) throw new Error('This key cannot be cloud synchronized');
-        const working = { ...journal.working }; delete working[key];
+        if (transactionDraft !== null) { delete transactionDraft[key]; return; }
+        const remaining = { ...journal.working }; delete remaining[key];
+        const working = validatedData(remaining);
         if (equal(working, journal.working)) return;
         save({ ...journal, working }); emit();
       },

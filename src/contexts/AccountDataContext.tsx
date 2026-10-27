@@ -6,6 +6,7 @@ import { createAccountStorage, readLegacyProgress } from '@/lib/accountStorage';
 import { observableStorage, type ObservableStorage } from '@/lib/observableStorage';
 import { createAccountSync, syncedProgressKeys, type ProgressData, type ProgressApi } from '@/lib/accountSync';
 import { previewLegacyImport } from '@/lib/legacyImport';
+import { validateProgressPayloads } from '@/lib/progressValidation';
 import { createAccountProgressApi } from '@/services/accountProgressApi';
 
 const AccountStorageContext = createContext<ObservableStorage | null>(null);
@@ -36,38 +37,54 @@ function CloudSession({ session, children }: { session: Session; children: React
     getSnapshot: () => createAccountProgressApi(session).getSnapshot(),
     commit: request => createAccountProgressApi(session).commit(request),
   };
-  const engine = useMemo(() => createAccountSync({ userId,
+  const engine = useMemo(() => createAccountSync({ userId, validateData: validateProgressPayloads,
     api: { getSnapshot: () => apiRef.current!.getSnapshot(), commit: request => apiRef.current!.commit(request) },
     // Durability failures must throw; never silently fall back to an in-memory queue.
     persistence: { getItem: key => window.localStorage.getItem(key), setItem: (key, value) => window.localStorage.setItem(key, value), removeItem: key => window.localStorage.removeItem(key) },
   }), [userId]);
   const state = useSyncExternalStore(engine.subscribe, engine.getState, engine.getState);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [lockError, setLockError] = useState<string | null>(null);
   const [writeError, setWriteError] = useState<string | null>(null);
   const [failedDraft, setFailedDraft] = useState<ProgressData>({});
-  const [viewRevision, setViewRevision] = useState(0);
   const [importDismissed, setImportDismissed] = useState(false);
   const [ownsLegacy, setOwnsLegacy] = useState(false);
   const local = useMemo(() => createAccountStorage(safeLocalStorage, userId), [userId]);
   const candidates = useMemo(() => ({ account: previewLegacyImport(local), shared: previewLegacyImport(safeLocalStorage) }), [local]);
   const [source, setSource] = useState<'account' | 'shared'>(() => Object.keys(candidates.account.data).length ? 'account' : 'shared');
-  const storage = useMemo(() => observableStorage({
+  const transactionDepth = useRef(0);
+  const storage = useMemo(() => {
+    const viewRevision = state.remoteRevision;
+    return observableStorage({
     getItem: key => cloudKeys.has(key) ? engine.storage.getItem(key) : local.getItem(key),
     setItem(key, value) {
+      if (viewRevision !== engine.getState().remoteRevision) return;
       try { if (cloudKeys.has(key)) engine.storage.setItem(key, value); else local.setItem(key, value); }
-      catch { setFailedDraft(previous => ({ ...previous, [key]: value })); setWriteError('This change could not be saved to durable device storage. Editing is paused; export your draft before freeing storage and reloading.'); }
+      catch (error) { if (transactionDepth.current) throw error; setFailedDraft(previous => ({ ...previous, [key]: value })); setWriteError('This change could not be saved to durable device storage. Editing is paused; export your draft before freeing storage and reloading.'); }
     },
     removeItem(key) {
+      if (viewRevision !== engine.getState().remoteRevision) return;
       try { if (cloudKeys.has(key)) engine.storage.removeItem(key); else local.removeItem(key); }
-      catch { setWriteError('A change could not be saved to durable device storage. Editing is paused.'); }
+      catch (error) { if (transactionDepth.current) throw error; setWriteError('A change could not be saved to durable device storage. Editing is paused.'); }
     },
-  }), [engine, local]);
+    transaction(work) {
+      if (viewRevision !== engine.getState().remoteRevision) return;
+      transactionDepth.current++;
+      try { engine.transaction(work); }
+      catch (error) {
+        const draft = (error as { unsavedProgress?: ProgressData }).unsavedProgress;
+        if (draft) setFailedDraft(draft);
+        setWriteError('The complete action could not be saved. No partial chore or reward changes were queued. Export the attempted draft before retrying.');
+      } finally { transactionDepth.current--; }
+    },
+    });
+  }, [engine, local, state.remoteRevision]);
+  const storageRef = useRef(storage);
+  storageRef.current = storage;
 
   const refresh = useCallback(async () => {
     await engine.flush();
-    const before = engine.getState().version;
     await engine.refresh();
-    if (engine.getState().ready && engine.getState().version !== before) setViewRevision(value => value + 1);
   }, [engine]);
 
   useEffect(() => {
@@ -75,7 +92,7 @@ function CloudSession({ session, children }: { session: Session; children: React
     let release: (() => void) | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = engine.subscribe(() => {
-      storage.notify();
+      storageRef.current.notify();
       if (timer) clearTimeout(timer);
       const current = engine.getState();
       if (current.phase === 'ready' && current.ready && current.dirty && !current.syncing) timer = setTimeout(() => { void engine.flush(); }, 350);
@@ -95,7 +112,7 @@ function CloudSession({ session, children }: { session: Session; children: React
     window.addEventListener('online', reconnect);
     window.addEventListener('focus', reconnect);
     return () => { active = false; if (timer) clearTimeout(timer); unsubscribe(); engine.dispose(); release?.(); window.removeEventListener('online', reconnect); window.removeEventListener('focus', reconnect); };
-  }, [engine, storage, userId, refresh]);
+  }, [engine, userId, refresh]);
 
   const exportCurrent = () => download('chorecoins-account-backup.json', { accountId: userId, version: state.version, data: state.data, unsavedDraft: failedDraft });
   const isEmpty = state.version === 0 && !Object.keys(state.data).length;
@@ -103,7 +120,10 @@ function CloudSession({ session, children }: { session: Session; children: React
   const showImport = state.ready && isEmpty && hasCandidate && !importDismissed;
   const importLegacy = () => {
     if (!ownsLegacy || !isEmpty || !state.ready) return;
-    for (const [key, value] of Object.entries(candidates[source].data)) storage.setItem(key, value);
+    storage.transaction(() => {
+      for (const [key, value] of Object.entries(candidates[source].data)) storage.setItem(key, value);
+      storage.setItem('importMetadata', JSON.stringify({ version: 1, source: source === 'account' ? 'legacy-account' : 'legacy-shared', consentedAt: new Date().toISOString(), fields: Object.keys(candidates[source].data) }));
+    });
     setImportDismissed(true);
     void engine.flush();
   };
@@ -113,8 +133,8 @@ function CloudSession({ session, children }: { session: Session; children: React
       Cloud progress: {state.syncing ? 'saving' : state.phase === 'ready' ? state.dirty ? 'queued on this device' : 'synced' : state.phase}.
       {' '}<button className="underline" disabled={!state.ready || state.syncing} onClick={() => { void refresh(); }}>Refresh cloud data</button>
       {' '}<button className="underline" onClick={exportCurrent}>Download account backup</button>
-      {' '}<button className="underline" onClick={() => { void logout(); }}>Sign out</button>
-      {state.error && <p>{state.error}</p>}
+      {' '}<button className="underline" onClick={() => { void logout().then(result => { if (!result.success) setActionError(result.error || 'Unable to sign out. Please retry.'); }); }}>Sign out</button>
+      {state.error && <p>{state.error}</p>}{actionError && <p role="alert">{actionError}</p>}
       {state.phase === 'offline' && <p>Offline changes remain on this device until acknowledged by the server. Do not clear browser storage.</p>}
     </aside>
     {lockError || writeError ? <section role="alert" className="p-6">{lockError || writeError}<button onClick={exportCurrent}>Export preserved draft</button></section>
@@ -122,7 +142,7 @@ function CloudSession({ session, children }: { session: Session; children: React
       <h2>Another device changed this account</h2>
       <p>Nothing has been overwritten. Download both versions before choosing the cloud copy. Automatic merging and replacing cloud rewards are not supported.</p>
       <button onClick={() => download('chorecoins-conflict-backup.json', state.conflict)}>Download both versions</button>
-      <button onClick={() => { if (window.confirm('Use the cloud version and discard these queued edits? Download both versions first.')) void engine.resolveConflict('server').then(() => setViewRevision(value => value + 1)); }}>Use cloud version</button>
+      <button onClick={() => { if (window.confirm('Use the cloud version and discard these queued edits? Download both versions first.')) void engine.resolveConflict('server'); }}>Use cloud version</button>
     </section>
     : !state.ready ? <section className="p-6" role="status"><p>Loading your cloud progress. No local defaults will replace cloud data.</p><button onClick={() => { void engine.refresh(); }}>Retry cloud connection</button></section>
     : showImport ? <section className="p-6 space-y-3">
@@ -133,11 +153,12 @@ function CloudSession({ session, children }: { session: Session; children: React
       </select>
       <details><summary>Preview data before import ({Object.keys(candidates[source].data).length} fields)</summary><pre className="max-h-60 overflow-auto">{JSON.stringify(candidates[source].data, null, 2)}</pre></details>
       {!!candidates[source].invalid.length && <p>Invalid fields are preserved locally but excluded from import: {candidates[source].invalid.join(', ')}.</p>}
+      {!!candidates[source].adjustments.length && <ul>{candidates[source].adjustments.map(message => <li key={message}>{message}</li>)}</ul>}
       <label><input type="checkbox" checked={ownsLegacy} onChange={event => setOwnsLegacy(event.target.checked)} /> I own this data and want it copied into {session.user.email || 'this account'}.</label>
       <button disabled={!ownsLegacy || !Object.keys(candidates[source].data).length} onClick={importLegacy}>Import previewed data</button>
       <button onClick={() => setImportDismissed(true)}>Start fresh</button>
     </section>
-    : <div key={viewRevision}>{children}</div>}
+    : <div key={state.remoteRevision}>{children}</div>}
   </AccountStorageContext.Provider>;
 }
 export function AccountDataBoundary({ children }: { children: ReactNode }) {

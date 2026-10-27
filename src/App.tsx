@@ -1,4 +1,4 @@
-import { AccountDataBoundary } from '@/contexts/AccountDataContext';
+import { AccountRouteGate } from '@/components/AccountRouteGate';
 import { useEffect } from "react";
 import { shouldRouteToRecovery } from "@/lib/authFlows";
 import { Toaster } from "@/components/ui/toaster";
@@ -27,21 +27,6 @@ import NotFound from "./pages/NotFound";
 import ResetPassword from "./pages/ResetPassword";
 
 const queryClient = new QueryClient();
-
-const AuthHashRedirect = () => {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { isPasswordRecovery } = useAuth();
-
-  useEffect(() => {
-    // Confirmation and magic-link tokens are not password recovery links.
-    if (shouldRouteToRecovery(location.hash, location.pathname, isPasswordRecovery)) {
-      navigate(`/reset-password${location.hash}`, { replace: true });
-    }
-  }, [location.pathname, location.hash, isPasswordRecovery, navigate]);
-
-  return null;
-};
 
 // Component to handle route changes and prevent sounds
 const RouteChangeHandler = () => {
@@ -151,7 +136,6 @@ const ScrollLockGuard = () => {
 const AppContent = () => (
   <div className="min-h-screen bg-background overflow-x-hidden">
     <ScrollLockGuard />
-    <AuthHashRedirect />
     <RouteChangeHandler />
     <Header />
     <Routes>
@@ -176,15 +160,17 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <AuthProvider>
-        <AccountDataBoundary>
+        <BrowserRouter>
+        <AccountRouteGate>
           <ThemeProvider>
             <Toaster />
             <Sonner />
             <NotificationWidget />
             <SoundToggle />
-            <BrowserRouter><AppContent /></BrowserRouter>
+            <AppContent />
           </ThemeProvider>
-        </AccountDataBoundary>
+        </AccountRouteGate>
+        </BrowserRouter>
       </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>

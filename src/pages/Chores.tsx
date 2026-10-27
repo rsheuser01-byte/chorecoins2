@@ -391,17 +391,12 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
   };
 
   const handleChoreComplete = (chore: Chore) => {
-    try {
-      // Show completion animation (for both Today tab and Calendar tab)
-      setChoreAnimation({ show: true, title: chore.title });
-      // Award chore completion (handles XP and achievements internally)
-      completeChore(0, choreOccurrenceId(chore));
-    } catch (error) {
-      console.error('Error completing chore:', error);
-    }
+    // Called inside the Today/calendar transaction; let failures roll back all writes.
+    completeChore(0, choreOccurrenceId(chore));
+    setChoreAnimation({ show: true, title: chore.title });
   };
 
-  const toggleChore = (choreId: string) => {
+  const toggleChore = (choreId: string) => safeLocalStorage.transaction(() => {
     const chore = choreData.find(c => c.id === choreId);
     if (!chore) return;
     
@@ -422,7 +417,7 @@ const convertToNewFormat = (oldChores: any[]): Chore[] => {
       // Unmarking as complete - decrement streak
       uncompleteChore();
     }
-  };
+  });
 
   const todayChores = choreData.filter(chore => isToday(chore.dueDate));
   const completedChores = todayChores.filter(chore => chore.completed).length;

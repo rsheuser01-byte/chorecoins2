@@ -2,10 +2,12 @@ import type { StorageAdapter } from './accountStorage';
 export interface ObservableStorage extends StorageAdapter {
   subscribe(listener: () => void): () => void;
   notify(): void;
+  transaction(work: () => void): void;
 }
-export function observableStorage(adapter: StorageAdapter): ObservableStorage {
+export function observableStorage(adapter: StorageAdapter & { transaction?: (work: () => void) => void }): ObservableStorage {
   const listeners = new Set<() => void>();
-  const notify = () => listeners.forEach(listener => listener());
+  let batching = 0;
+  const notify = () => { if (!batching) listeners.forEach(listener => listener()); };
   return {
     getItem: key => adapter.getItem(key),
     setItem(key, value) {
@@ -18,5 +20,10 @@ export function observableStorage(adapter: StorageAdapter): ObservableStorage {
     },
     subscribe(listener) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     notify,
+    transaction(work) {
+      batching++;
+      try { if (adapter.transaction) adapter.transaction(work); else work(); }
+      finally { batching--; notify(); }
+    },
   };
 }

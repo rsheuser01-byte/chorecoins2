@@ -109,7 +109,7 @@ export default function ChoresEnhanced() {
   const { userStats, completeChore, uncompleteChore } = useGamification();
 
   // State management
-  const [chores, setChores] = useState<Chore[]>(() => {
+  const [chores, setChoresState] = useState<Chore[]>(() => {
     const saved = safeLocalStorage.getItem('chores');
     return saved ? JSON.parse(saved).map((chore: any) => ({
       ...chore,
@@ -143,10 +143,11 @@ export default function ChoresEnhanced() {
       : [...days, dayValue].sort();
   };
 
-  // Save chores to localStorage
-  useEffect(() => {
-    safeLocalStorage.setItem('chores', JSON.stringify(chores));
-  }, [chores]);
+  // Persist synchronously so completion + stats share the caller's transaction.
+  const setChores = (next: Chore[]) => {
+    safeLocalStorage.setItem('chores', JSON.stringify(next));
+    setChoresState(next);
+  };
 
   // Load weekly allowance from localStorage
   useEffect(() => {
@@ -412,7 +413,7 @@ export default function ChoresEnhanced() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  onClick={() => {
+                                  onClick={() => safeLocalStorage.transaction(() => {
                                     const updatedChore = { ...chore, completed: !chore.completed };
                                     const updatedChores = chores.map(c => c.id === chore.id ? updatedChore : c);
                                     setChores(updatedChores);
@@ -422,7 +423,7 @@ export default function ChoresEnhanced() {
                                     } else {
                                       uncompleteChore();
                                     }
-                                  }}
+                                  })}
                                   className={`p-0 h-8 w-8 rounded-full transition-all duration-300 ${
                                     chore.completed 
                                       ? 'bg-money-green text-white scale-110 shadow-lg' 
