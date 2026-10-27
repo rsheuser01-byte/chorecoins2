@@ -1,4 +1,4 @@
-import { legacyProgressKeys, type StorageAdapter } from './accountStorage';
+import { legacyProgressKeys, type StorageAdapter } from './accountStorage.ts';
 import type { ProgressData } from './accountSync';
 
 export function previewLegacyImport(storage: StorageAdapter) {

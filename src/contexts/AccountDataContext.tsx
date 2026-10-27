@@ -141,8 +141,8 @@ function CloudSession({ session, children }: { session: Session; children: React
   </AccountStorageContext.Provider>;
 }
 export function AccountDataBoundary({ children }: { children: ReactNode }) {
-  const { session, isLoading } = useAuth();
-  if (isLoading) return <p role="status">Loading your account…</p>;
+  const { session, isLoading, authStatusError } = useAuth();
+  if (isLoading) return <section role="status"><p>{authStatusError || 'Loading your account…'}</p>{authStatusError && <button onClick={() => window.location.reload()}>Reload to retry account connection</button>}</section>;
   return session ? <CloudSession key={`user:${session.user.id}`} session={session}>{children}</CloudSession> : <GuestSession key="guest">{children}</GuestSession>;
 }
 export function useAccountStorage() {

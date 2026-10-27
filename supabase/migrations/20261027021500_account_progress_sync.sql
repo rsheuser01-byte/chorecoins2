@@ -17,7 +17,7 @@ CREATE TABLE chorecoins_private.account_progress_operations (
   operation_id uuid NOT NULL,
   expected_version bigint NOT NULL,
   result_version bigint NOT NULL,
-  data jsonb NOT NULL,
+  payload_hash bytea NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (user_id, operation_id)
 );
@@ -62,6 +62,7 @@ DECLARE
   v_expected bigint := expected_version;
   v_operation uuid := operation_id;
   v_data jsonb := data;
+  v_payload_hash bytea;
   v_row public.account_progress%ROWTYPE;
   v_receipt chorecoins_private.account_progress_operations%ROWTYPE;
   v_stats jsonb;
@@ -75,7 +76,7 @@ DECLARE
     'chores', 'weeklyAllowance', 'customChoreTemplates', 'userStats', 'achievements',
     'profileData', 'portfolio', 'cash', 'savingsGoals', 'spendingTransactions',
     'marketStocks', 'marketCash', 'learnEarnLessons', 'learnEarnTotal',
-    'welcomeModalDismissed', 'marketSimulatorTutorialDismissed'
+    'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors'
   ];
 BEGIN
   IF v_user IS NULL THEN
@@ -95,6 +96,8 @@ BEGIN
     RAISE EXCEPTION 'Unsupported progress key or value type' USING ERRCODE = '22023';
   END IF;
 
+  v_payload_hash := pg_catalog.sha256(pg_catalog.convert_to(v_data::text, 'UTF8'));
+
   -- Serialize first creation as well as subsequent writes/retries for one owner.
   -- Hash collisions only cause extra serialization; they cannot change ownership.
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(v_user::text, 0));
@@ -108,7 +111,7 @@ BEGIN
   SELECT * INTO v_receipt FROM chorecoins_private.account_progress_operations
     WHERE user_id = v_user AND account_progress_operations.operation_id = v_operation;
   IF FOUND THEN
-    IF v_receipt.expected_version <> v_expected OR v_receipt.data <> v_data THEN
+    IF v_receipt.expected_version <> v_expected OR v_receipt.payload_hash <> v_payload_hash THEN
       RAISE EXCEPTION 'Operation ID was already used with different content' USING ERRCODE = '22023';
     END IF;
     RETURN jsonb_build_object('status', 'duplicate', 'version', v_row.version,
@@ -162,8 +165,8 @@ BEGIN
     VALUES (v_user, v_expected + 1, v_data, pg_catalog.now())
     ON CONFLICT (user_id) DO UPDATE SET
       version = EXCLUDED.version, data = EXCLUDED.data, updated_at = EXCLUDED.updated_at;
-  INSERT INTO chorecoins_private.account_progress_operations(user_id, operation_id, expected_version, result_version, data)
-    VALUES (v_user, v_operation, v_expected, v_expected + 1, v_data);
+  INSERT INTO chorecoins_private.account_progress_operations(user_id, operation_id, expected_version, result_version, payload_hash)
+    VALUES (v_user, v_operation, v_expected, v_expected + 1, v_payload_hash);
   RETURN jsonb_build_object('status', 'applied', 'version', v_expected + 1,
     'data', v_data, 'operation_version', v_expected + 1);
 END;

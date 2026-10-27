@@ -15,7 +15,7 @@ export const syncedProgressKeys = [
   'chores', 'weeklyAllowance', 'customChoreTemplates', 'userStats', 'achievements',
   'profileData', 'portfolio', 'cash', 'savingsGoals', 'spendingTransactions',
   'marketStocks', 'marketCash', 'learnEarnLessons', 'learnEarnTotal',
-  'welcomeModalDismissed', 'marketSimulatorTutorialDismissed',
+  'welcomeModalDismissed', 'marketSimulatorTutorialDismissed', 'theme', 'customColors',
 ] as const;
 const allowed = new Set<string>(syncedProgressKeys);
 const MAX_BYTES = 1024 * 1024;
@@ -167,9 +167,10 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
     }
     emit({ phase: 'ready', ready: true, syncing: false, error: null, conflict: null });
   }
+  const getCurrentState = (): SyncState => state;
   const engine = {
     journalKey,
-    getState: () => state,
+    getState: getCurrentState,
     subscribe(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; },
     initialize: () => queue(async () => {
       if (initialized) return;
@@ -185,7 +186,7 @@ export function createAccountSync({ userId, api, persistence, operationId = () =
     flush: () => queue(async () => {
       if (!initialized || !journal || state.phase === 'conflict' || state.phase === 'error') return;
       try {
-        do { await commitPending(); } while (!disposed && state.phase !== 'conflict' && journal && !equal(journal.working, journal.base.data));
+        do { await commitPending(); } while (!disposed && getCurrentState().phase !== 'conflict' && journal && !equal(journal.working, journal.base.data));
       } catch (error) { failure(error); }
     }),
     refresh: () => queue(async () => {

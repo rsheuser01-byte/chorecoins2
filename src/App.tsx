@@ -174,23 +174,20 @@ const AppContent = () => (
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <TooltipProvider>
-        <AuthProvider>
-          <AccountDataBoundary>
-          <Toaster />
-          <Sonner />
-          <NotificationWidget />
-          <SoundToggle />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-                  </AccountDataBoundary>
-        </AuthProvider>
-      </TooltipProvider>
-    </ThemeProvider>
+    <TooltipProvider>
+      <AuthProvider>
+        <AccountDataBoundary>
+          <ThemeProvider>
+            <Toaster />
+            <Sonner />
+            <NotificationWidget />
+            <SoundToggle />
+            <BrowserRouter><AppContent /></BrowserRouter>
+          </ThemeProvider>
+        </AccountDataBoundary>
+      </AuthProvider>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 
 export default App;
-

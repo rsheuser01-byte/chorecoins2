@@ -138,6 +138,7 @@ RESET ROLE;
 DO $$ BEGIN
   ASSERT (SELECT data->>'chores' FROM public.account_progress WHERE user_id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa') = 'A2', 'A data changed during B tests';
   ASSERT (SELECT count(*) FROM chorecoins_private.account_progress_operations) = 4, 'Unexpected receipt count';
+  ASSERT (SELECT bool_and(octet_length(payload_hash) = 32) FROM chorecoins_private.account_progress_operations), 'Receipt is not a SHA-256 digest';
   ASSERT NOT has_function_privilege('anon', 'public.commit_account_progress(bigint,uuid,jsonb)', 'EXECUTE');
   ASSERT NOT has_function_privilege('anon', 'chorecoins_private.commit_account_progress(bigint,uuid,jsonb)', 'EXECUTE');
   ASSERT NOT has_schema_privilege('anon', 'chorecoins_private', 'USAGE');
