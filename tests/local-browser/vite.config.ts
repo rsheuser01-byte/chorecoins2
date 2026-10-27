@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../../', import.meta.url));
 export default defineConfig({
   root, envFile: false, envPrefix: [], plugins: [react()],
-  // Deliberately no VITE_CLOUD_SYNC_ENABLED define: real default must stay OFF.
+  // Test both missing flag and unexpected true; neither bypasses production lock.
+  define: process.env.LOCAL_TEST_CLOUD_VALUE ? { 'import.meta.env.VITE_CLOUD_SYNC_ENABLED': JSON.stringify(process.env.LOCAL_TEST_CLOUD_VALUE) } : {},
   resolve: { alias: [
     { find: '@/integrations/supabase/client', replacement: `${root}tests/browser/supabase-mock.ts` },
     { find: '@/services/accountProgressApi', replacement: `${root}tests/local-browser/cloud-forbidden.ts` },
