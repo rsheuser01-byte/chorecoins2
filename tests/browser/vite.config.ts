@@ -9,6 +9,7 @@ export default defineConfig({
   define: { 'import.meta.env.VITE_CLOUD_SYNC_ENABLED': JSON.stringify('true') },
   plugins: [react()],
   resolve: { alias: [
+    { find: '@/lib/cloudFeature', replacement: `${root}tests/browser/cloud-enabled.ts` },
     { find: '@/integrations/supabase/client', replacement: `${root}tests/browser/supabase-mock.ts` },
     { find: '@/services/accountProgressApi', replacement: `${root}tests/browser/supabase-mock.ts` },
     { find: '@', replacement: `${root}src` },
