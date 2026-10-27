@@ -1,282 +1,105 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Bell, Clock, Calendar } from 'lucide-react';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
-import { TestNotification } from '@/components/TestNotification';
+import { useAuth } from '@/contexts/AuthContext';
+import { createReminderPreferencesApi, type ReminderPreferences } from '@/services/reminderPreferencesApi';
+import { REMINDER_SETTINGS_EVENT } from '@/components/InAppReminder';
 
-const DAYS = [
-  { value: 1, label: 'Monday' },
-  { value: 2, label: 'Tuesday' },
-  { value: 3, label: 'Wednesday' },
-  { value: 4, label: 'Thursday' },
-  { value: 5, label: 'Friday' },
-  { value: 6, label: 'Saturday' },
-  { value: 7, label: 'Sunday' },
-];
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const deviceTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+const defaults = (): ReminderPreferences => ({ chore_reminders_enabled: false, reminder_time: '09:00', reminder_days: [1, 2, 3, 4, 5, 6, 7], timezone: deviceTimezone(), timezone_offset_minutes: new Date().getTimezoneOffset() });
+function validPreferences(value: ReminderPreferences) {
+  if (typeof value.chore_reminders_enabled !== 'boolean' || !/^([01]\d|2[0-3]):[0-5]\d(:00)?$/.test(value.reminder_time)
+    || !Array.isArray(value.reminder_days) || value.reminder_days.length > 7 || new Set(value.reminder_days).size !== value.reminder_days.length || !value.reminder_days.every(day => Number.isInteger(day) && day >= 1 && day <= 7)) return false;
+  // Preserve old missing/invalid zones for explicit correction, never assume UTC.
+  return true;
+}
+function validZone(zone: string | null) {
+  try { if (!zone) return false; new Intl.DateTimeFormat('en', { timeZone: zone }).format(); return true; } catch { return false; }
+}
 
 export default function Notifications() {
-  const { permission, isSupported, requestPermission, unsubscribe } = usePushNotifications();
-  const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const timezoneOffsetMinutes = new Date().getTimezoneOffset();
-  const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [preferences, setPreferences] = useState({
-    chore_reminders_enabled: true,
-    reminder_time: '09:00',
-    reminder_days: [1, 2, 3, 4, 5, 6, 7],
-    push_enabled: false,
-    timezone_offset_minutes: timezoneOffsetMinutes,
-    timezone: timezoneName,
-  });
+  const { user, session, isLoading } = useAuth();
+  const owner = user?.id;
+  const current = useRef({ owner, session });
+  current.current = { owner, session };
+  const [preferences, setPreferences] = useState<ReminderPreferences>(defaults);
+  const [loadedOwner, setLoadedOwner] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+  const [reload, setReload] = useState(0);
+  const saving = useRef(false);
+  const saveRequest = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    loadPreferences();
-  }, []);
-
-  const loadPreferences = async () => {
-    if (!supabase) return;
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error loading preferences:', error);
-        return;
+    setLoadedOwner(null); setMessage(''); setPreferences(defaults()); setBusy(false);
+    saving.current = false;
+    saveRequest.current?.abort();
+    if (!owner || isLoading) return;
+    let active = true;
+    const controller = new AbortController();
+    const capturedSession = current.current.session;
+    if (!capturedSession || capturedSession.user.id !== owner) return;
+    void (async () => {
+      try {
+        const data = await createReminderPreferencesApi(capturedSession).load(controller.signal);
+        if (!active || controller.signal.aborted) return;
+        if (data && !validPreferences(data)) throw new Error('Invalid preferences');
+        setPreferences(data ? { ...data, reminder_time: data.reminder_time.slice(0, 5) } : defaults());
+        setLoadedOwner(owner);
+        if (reload > 0) window.dispatchEvent(new CustomEvent(REMINDER_SETTINGS_EVENT, { detail: { userId: owner } }));
+      } catch {
+        if (active && !controller.signal.aborted) setMessage('Could not load your reminder settings. Existing choices have not been changed.');
       }
+    })();
+    return () => { active = false; controller.abort(); saveRequest.current?.abort(); };
+  }, [owner, isLoading, reload]);
 
-      if (data) {
-        setPreferences({
-          chore_reminders_enabled: data.chore_reminders_enabled,
-          reminder_time: data.reminder_time.substring(0, 5),
-          reminder_days: data.reminder_days || [1, 2, 3, 4, 5, 6, 7],
-          push_enabled: data.push_enabled,
-          timezone_offset_minutes: data.timezone_offset_minutes ?? timezoneOffsetMinutes,
-          timezone: data.timezone || timezoneName,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading preferences:', error);
+  const save = async () => {
+    if (!owner || loadedOwner !== owner || saving.current) return;
+    const captured = current.current.session;
+    if (!captured || captured.user.id !== owner) return;
+    if (!validPreferences(preferences) || (preferences.chore_reminders_enabled && !validZone(preferences.timezone))) {
+      setMessage('Choose a valid reminder time and timezone before enabling reminders.'); return;
     }
-  };
-
-  const savePreferences = async () => {
-    if (!supabase) {
-      toast({
-        title: "Error",
-        description: "Database connection not available.",
-        variant: "destructive",
-      });
-      return;
-    }
+    saving.current = true; setBusy(true); setMessage('');
+    const controller = new AbortController(); saveRequest.current = controller;
     try {
-      setLoading(true);
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError) {
-        console.error('Auth error:', authError);
-        throw new Error('Not authenticated. Please log in.');
-      }
-      
-      if (!user) {
-        throw new Error('No user found. Please log in.');
-      }
-
-      // Format reminder_time to include seconds (HH:MM:SS format for TIME type)
-      const reminderTimeFormatted = preferences.reminder_time.includes(':') 
-        ? `${preferences.reminder_time}:00` 
-        : `${preferences.reminder_time}:00:00`;
-      const currentOffsetMinutes = new Date().getTimezoneOffset();
-      const currentTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-      const { error, data } = await supabase
-        .from('notification_preferences')
-        .upsert({
-          user_id: user.id,
-          chore_reminders_enabled: preferences.chore_reminders_enabled,
-          reminder_time: reminderTimeFormatted,
-          reminder_days: preferences.reminder_days,
-          push_enabled: preferences.push_enabled,
-          timezone_offset_minutes: currentOffsetMinutes,
-          timezone: currentTimezone,
-        }, {
-          onConflict: 'user_id'
-        })
-        .select();
-
-      if (error) {
-        console.error('Supabase error:', error);
-        throw error;
-      }
-
-      toast({
-        title: "Settings Saved",
-        description: "Your notification preferences have been updated.",
-      });
-    } catch (error: any) {
-      console.error('Error saving preferences:', error);
-      const errorMessage = error?.message || error?.details || 'Failed to save preferences.';
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      await createReminderPreferencesApi(captured).save({ ...preferences, reminder_time: `${preferences.reminder_time}:00` }, controller.signal);
+      if (current.current.owner !== owner || controller.signal.aborted) return;
+      setMessage('Reminder settings saved. Background push remains paused.');
+      window.dispatchEvent(new CustomEvent(REMINDER_SETTINGS_EVENT, { detail: { userId: owner } }));
+    } catch {
+      if (current.current.owner === owner && !controller.signal.aborted) setMessage('Could not confirm the save. Reload settings before retrying; your earlier choices are preserved unless the server accepted this save.');
     } finally {
-      setLoading(false);
+      if (saveRequest.current === controller) { saving.current = false; setBusy(false); }
     }
   };
-
-  const handlePushToggle = async (enabled: boolean) => {
-    if (enabled) {
-      const granted = await requestPermission();
-      if (granted) {
-        setPreferences({ ...preferences, push_enabled: true });
-      }
-    } else {
-      await unsubscribe();
-      setPreferences({ ...preferences, push_enabled: false });
-    }
-  };
-
-  const toggleDay = (day: number) => {
-    const newDays = preferences.reminder_days.includes(day)
-      ? preferences.reminder_days.filter(d => d !== day)
-      : [...preferences.reminder_days, day].sort();
-    setPreferences({ ...preferences, reminder_days: newDays });
-  };
-
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2 text-gradient">Notification Settings</h1>
-          <p className="text-muted-foreground">
-            Configure how and when you want to receive chore reminders
-          </p>
-        </div>
-
-        <div className="space-y-6">
-          {/* Push Notifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5 text-primary" />
-                Push Notifications
-              </CardTitle>
-              <CardDescription>
-                Receive browser notifications even when the app is closed
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {!isSupported && (
-                <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    Push notifications require a supported browser. On iPad/iPhone, use Safari and add the app to your Home Screen. On Android, use Chrome.
-                  </p>
-                </div>
-              )}
-
-              {isSupported && permission === 'denied' && (
-                <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <p className="text-sm text-red-800 dark:text-red-200">
-                    Notifications are blocked. Please enable them in your browser settings.
-                  </p>
-                </div>
-              )}
-
-              <div className="flex items-center justify-between">
-                <Label htmlFor="push-enabled">Enable Push Notifications</Label>
-                <Switch
-                  id="push-enabled"
-                  checked={preferences.push_enabled}
-                  onCheckedChange={handlePushToggle}
-                  disabled={!isSupported || permission === 'denied'}
-                />
-              </div>
-
-              {preferences.push_enabled && permission === 'granted' && (
-                <div className="pt-4 border-t">
-                  <TestNotification />
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Chore Reminders */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                Chore Reminders
-              </CardTitle>
-              <CardDescription>
-                Set when you want to be reminded about your chores
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="chore-reminders">Enable Chore Reminders</Label>
-                <Switch
-                  id="chore-reminders"
-                  checked={preferences.chore_reminders_enabled}
-                  onCheckedChange={(checked) =>
-                    setPreferences({ ...preferences, chore_reminders_enabled: checked })
-                  }
-                />
-              </div>
-
-              {preferences.chore_reminders_enabled && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="reminder-time">Reminder Time</Label>
-                    <Input
-                      id="reminder-time"
-                      type="time"
-                      value={preferences.reminder_time}
-                      onChange={(e) =>
-                        setPreferences({ ...preferences, reminder_time: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Reminder Days
-                    </Label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {DAYS.map((day) => (
-                        <Button
-                          key={day.value}
-                          variant={preferences.reminder_days.includes(day.value) ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={() => toggleDay(day.value)}
-                          className="w-full"
-                        >
-                          {day.label.substring(0, 3)}
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Button onClick={savePreferences} disabled={loading} className="w-full">
-            {loading ? 'Saving...' : 'Save Settings'}
-          </Button>
-        </div>
-    </div>
-  );
+  const ready = !!owner && loadedOwner === owner && !isLoading;
+  return <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <h1 className="text-4xl font-bold mb-4">Reminder Settings</h1>
+    <Card><CardHeader><CardTitle>In-app chore reminders</CardTitle>
+      <CardDescription>Reminders appear only while this app is open and visible. Background push is paused; no reminders are sent while the app is closed. Your saved push choices are retained.</CardDescription>
+    </CardHeader><CardContent className="space-y-5">
+      {!owner && !isLoading && <p>Sign in to manage your own reminder schedule.</p>}
+      {!!owner && !ready && !message && <p>Loading your reminder settings…</p>}
+      {message && <p role="status">{message}</p>}
+      {!!owner && <Button variant="outline" disabled={busy} onClick={() => setReload(value => value + 1)}>Reload settings</Button>}
+      {ready && <fieldset disabled={!ready || busy} className="space-y-5">
+        <div className="flex items-center justify-between"><Label htmlFor="chore-reminders">Enable in-app chore reminders</Label>
+          <Switch id="chore-reminders" checked={ready && preferences.chore_reminders_enabled} onCheckedChange={checked => setPreferences(value => ({ ...value, chore_reminders_enabled: checked }))} /></div>
+        <div><Label htmlFor="reminder-time">Reminder Time</Label><Input id="reminder-time" type="time" value={preferences.reminder_time} onChange={event => setPreferences(value => ({ ...value, reminder_time: event.target.value }))} /></div>
+        <div><p>Schedule timezone: {preferences.timezone || 'Not set — choose your device timezone'}</p>
+          <Button variant="outline" onClick={() => setPreferences(value => ({ ...value, timezone: deviceTimezone(), timezone_offset_minutes: new Date().getTimezoneOffset() }))}>Use device timezone</Button></div>
+        <div><Label>Reminder Days</Label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {DAYS.map((day, index) => <Button key={day} variant={preferences.reminder_days.includes(index + 1) ? 'default' : 'outline'} aria-pressed={preferences.reminder_days.includes(index + 1)} onClick={() => setPreferences(value => ({ ...value, reminder_days: value.reminder_days.includes(index + 1) ? value.reminder_days.filter(item => item !== index + 1) : [...value.reminder_days, index + 1].sort() }))}>{day}</Button>)}
+        </div></div>
+        <p className="text-sm text-muted-foreground">Late reminders are skipped after 15 minutes. Dismissal is remembered on this browser; other devices may show their own reminder. No notification permission is requested.</p>
+        <Button onClick={save} disabled={!ready || busy}>{busy ? 'Saving…' : 'Save Settings'}</Button>
+      </fieldset>}
+    </CardContent></Card>
+  </div>;
 }

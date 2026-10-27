@@ -57,6 +57,9 @@ jobs:
       - name: Source lock rejects unexpected cloud opt-in environment
         if: ${{ !cancelled() }}
         run: LOCAL_TEST_CLOUD_VALUE=true npm run test:local-browser
+      - name: Rendered app-open reminder integration (mocked preferences)
+        if: ${{ !cancelled() }}
+        run: npm run test:reminders-browser
 
   database:
     runs-on: ubuntu-latest

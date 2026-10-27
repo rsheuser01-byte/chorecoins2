@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "check:bundle": "node scripts/check-bundle.mjs",
     "test:browser": "node scripts/test-browser.mjs",
+    "test:reminders-browser": "node scripts/test-reminder-browser.mjs",
     "test:local-browser": "node scripts/test-local-browser.mjs"
   },
   "dependencies": {

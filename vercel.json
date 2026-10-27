@@ -12,7 +12,8 @@
   ],
   "git": {
     "deploymentEnabled": {
-      "codex/account-auth-isolation-20261027": false
+      "codex/account-auth-isolation-20261027": false,
+      "codex/in-app-reminders-20261027": false
     }
   }
 }

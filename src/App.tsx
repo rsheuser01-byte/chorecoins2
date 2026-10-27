@@ -1,3 +1,4 @@
+import { InAppReminder } from "@/components/InAppReminder";
 import { AccountRouteGate } from '@/components/AccountRouteGate';
 import { useEffect } from "react";
 import { shouldRouteToRecovery } from "@/lib/authFlows";
@@ -137,6 +138,7 @@ const AppContent = () => (
   <div className="min-h-screen bg-background overflow-x-hidden">
     <ScrollLockGuard />
     <RouteChangeHandler />
+    <InAppReminder />
     <Header />
     <Routes>
       <Route path="/" element={<Index />} />
