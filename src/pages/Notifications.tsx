@@ -50,6 +50,7 @@ export default function Notifications() {
         if (data && !validPreferences(data)) throw new Error('Invalid preferences');
         setPreferences(data ? { ...data, reminder_time: data.reminder_time.slice(0, 5) } : defaults());
         setLoadedOwner(owner);
+        if (reload > 0) window.dispatchEvent(new CustomEvent(REMINDER_SETTINGS_EVENT, { detail: { userId: owner } }));
       } catch {
         if (active && !controller.signal.aborted) setMessage('Could not load your reminder settings. Existing choices have not been changed.');
       }
