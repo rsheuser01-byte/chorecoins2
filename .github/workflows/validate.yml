@@ -51,6 +51,9 @@ jobs:
       - name: Rendered browser integration with mocked auth
         if: ${{ !cancelled() }}
         run: npm run test:browser
+      - name: Rendered app-open reminder integration (mocked preferences)
+        if: ${{ !cancelled() }}
+        run: npm run test:reminders-browser
 
   database:
     runs-on: ubuntu-latest
