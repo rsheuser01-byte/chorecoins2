@@ -1,7 +1,7 @@
 # Learning village prototype — local review
 
 Baseline fetched and verified: `46758a69fe88ebc39281a7b3edac86aa9a62da50` (main, November 4, 2026).
-Branch: `codex/chorecoins2-learning-redesign`. Local only; no push, deployment, merge, live API call, or migration was performed. Vercel deploys branches by default and only explicitly guards two older branches. Before any push, separately verify a disabled deployment setting for this branch. The GitHub workflow runs on PR/manual dispatch, not branch pushes; this does not disable Vercel previews.
+Branch: `codex/chorecoins2-learning-redesign`. Prepared for publication as a separate GitHub branch at the user’s request. No merge, live API call, or migration was performed. The branch now explicitly disables Vercel Git deployment in vercel.json, preserving the two existing branch guards. The GitHub workflow runs on PR/manual dispatch, not branch pushes; this does not disable Vercel previews.
 
 ## Try it
 

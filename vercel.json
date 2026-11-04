@@ -13,7 +13,8 @@
   "git": {
     "deploymentEnabled": {
       "codex/account-auth-isolation-20261027": false,
-      "codex/in-app-reminders-20261027": false
+      "codex/in-app-reminders-20261027": false,
+      "codex/chorecoins2-learning-redesign": false
     }
   }
 }
