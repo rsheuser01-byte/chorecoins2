@@ -73,3 +73,7 @@ Inspected screenshots: desktop and phone hub, phone lesson, desktop shop, comple
 Ask: What was fun? What was confusing? Too easy or too hard? Would you choose another activity? Record feedback manually; no child analytics are collected. The displayed time ranges are targets, not measured child-session durations.
 
 Next: test the pace with the family, improve the shop's physical assembly/customer interactions if needed, and complete accessibility review before considering integration. Treasure Island could later replace the shop supplies with expedition gear and the customer totals with travel purchases using the same small question/choice model; no second game or generalized engine is included. Any release, hosted preview, real-account integration or wallet rewards requires separate review.
+
+## Preview publication update
+
+The user subsequently authorized a hosted preview. On this branch only, Vercel Git deployment is enabled and the build command is `node scripts/build-learning-preview.mjs`. This produces a standalone prototype entry without loading environment files, the classic App, authentication, trading, or notification modules. The preview opens the village directly and omits classic navigation links. Main retains its original deployment configuration. Do not merge this preview-specific Vercel configuration into main. Hosting success and the preview URL must be confirmed from Vercel deployment status.

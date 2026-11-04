@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "node scripts/build-learning-preview.mjs",
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "installCommand": "npm install --legacy-peer-deps",
@@ -14,7 +14,7 @@
     "deploymentEnabled": {
       "codex/account-auth-isolation-20261027": false,
       "codex/in-app-reminders-20261027": false,
-      "codex/chorecoins2-learning-redesign": false
+      "codex/chorecoins2-learning-redesign": true
     }
   }
 }
