@@ -77,3 +77,7 @@ Next: test the pace with the family, improve the shop's physical assembly/custom
 ## Preview publication update
 
 The user subsequently authorized a hosted preview. On this branch only, Vercel Git deployment is enabled and the build command is `node scripts/build-learning-preview.mjs`. This produces a standalone prototype entry without loading environment files, the classic App, authentication, trading, or notification modules. The preview opens the village directly and omits classic navigation links. Main retains its original deployment configuration. Do not merge this preview-specific Vercel configuration into main. Hosting success and the preview URL must be confirmed from Vercel deployment status.
+
+## Preview withdrawn
+
+The user rejected this prototype and requested its removal. Automatic Vercel deployment for this branch is disabled again. Existing hosted deployments must be deleted in Vercel; this configuration change does not delete them. Main is unchanged.
